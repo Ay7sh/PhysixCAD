@@ -56,3 +56,4 @@ The catalog uses public sources including the FreeCAD-library and Printables. Re
 
 Auto-generated metadata is intended as a simulation bootstrap. Vendor-certified masses, load ratings, and safety constraints should be reviewed before safety-critical use.
 # PhysixCAD
+# PhysixCAD
