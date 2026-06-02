@@ -55,3 +55,4 @@ python catalog_expander.py
 The catalog uses public sources including the FreeCAD-library and Printables. Remote hosts can rate-limit automated downloads, so smart packages include source provenance and a small fallback STL preview if a host is unavailable during the request.
 
 Auto-generated metadata is intended as a simulation bootstrap. Vendor-certified masses, load ratings, and safety constraints should be reviewed before safety-critical use.
+# PhysixCAD
