@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhysixCAD Smart CAD Marketplace</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --panel: rgba(12, 17, 23, 0.9);
+      --line: rgba(148, 163, 184, 0.22);
+      --ink: #e5edf6;
+      --muted: #94a3b8;
+      --cyan: #35d6c8;
+      --lime: #b8f36d;
+      --amber: #f5b74f;
+      --pink: #f472b6;
+      --blue: #7dd3fc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(4, 8, 12, 0.15), rgba(4, 8, 12, 0.95)),
+        repeating-linear-gradient(90deg, rgba(255,255,255,0.032) 0 1px, transparent 1px 72px),
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.024) 0 1px, transparent 1px 72px),
+        #070b0f;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      letter-spacing: 0;
+    }
+    button, input { letter-spacing: 0; }
+    .glass {
+      border: 1px solid var(--line);
+      background: rgba(8, 13, 18, 0.78);
+      backdrop-filter: blur(18px);
+    }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(18, 25, 33, 0.94), rgba(9, 13, 18, 0.97));
+      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.32);
+    }
+    .preview-shell {
+      position: relative;
+      overflow: hidden;
+      border-radius: 6px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background:
+        linear-gradient(135deg, rgba(53, 214, 200, 0.08), rgba(245, 183, 79, 0.05)),
+        radial-gradient(circle at 50% 46%, rgba(255,255,255,0.08), transparent 42%),
+        #060b10;
+      aspect-ratio: 16 / 10;
+    }
+    .preview-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+      background-size: 24px 24px;
+      mask-image: radial-gradient(circle, black 54%, transparent 84%);
+      pointer-events: none;
+    }
+    .part-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 1.6rem;
+      filter: saturate(0.96) contrast(1.05);
+      opacity: 0.88;
+    }
+    .preview-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      mix-blend-mode: screen;
+      opacity: 0.68;
+    }
+    .spec-row {
+      display: grid;
+      grid-template-columns: minmax(6.4rem, 0.65fr) minmax(0, 1fr);
+      gap: 0.75rem;
+      align-items: start;
+      padding: 0.52rem 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.13);
+    }
+    .spec-row:last-child { border-bottom: 0; }
+    .chip-scroll {
+      scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+    }
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div class="mx-auto flex min-h-screen w-full max-w-[92rem] flex-col px-4 py-5 sm:px-6 lg:px-8">
+    <header class="glass sticky top-3 z-20 mb-5 rounded-lg px-4 py-3">
+      <div class="grid gap-4 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+        <div class="flex items-center gap-3">
+          <div class="grid h-10 w-10 place-items-center rounded-md border border-cyan-300/40 bg-cyan-300/10">
+            <i data-lucide="cuboid" class="h-5 w-5 text-cyan-200"></i>
+          </div>
+          <div>
+            <h1 class="text-xl font-semibold text-white">PhysixCAD</h1>
+            <p class="text-xs uppercase text-slate-400">Smart CAD Marketplace</p>
+          </div>
+        </div>
+        <div class="relative">
+          <i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"></i>
+          <input id="search" class="h-11 w-full rounded-md border border-slate-700 bg-slate-950/70 pl-10 pr-3 text-sm text-slate-100 outline-none transition focus:border-cyan-300/60" placeholder="Search part, material, constraint, competition, or repository">
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-xs text-slate-300 lg:min-w-[24rem]">
+          <div class="rounded-md border border-slate-700/80 bg-slate-950/60 px-3 py-2">
+            <span class="block text-slate-500">Models</span>
+            <strong id="stat-models" class="text-base text-white">0</strong>
+          </div>
+          <div class="rounded-md border border-slate-700/80 bg-slate-950/60 px-3 py-2">
+            <span class="block text-slate-500">Categories</span>
+            <strong id="stat-categories" class="text-base text-white">0</strong>
+          </div>
+          <div class="rounded-md border border-slate-700/80 bg-slate-950/60 px-3 py-2">
+            <span class="block text-slate-500">Source Img</span>
+            <strong id="stat-images" class="text-base text-white">0</strong>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1">
+      <section class="mb-5">
+        <div id="filters" class="chip-scroll flex gap-2 overflow-x-auto pb-2"></div>
+      </section>
+
+      <section class="mb-3 flex items-center justify-between gap-3 text-sm text-slate-400">
+        <div id="result-count">Loading catalog...</div>
+        <a href="/api/source-pipeline" class="inline-flex items-center gap-1 rounded-md border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs text-slate-300 hover:border-cyan-300/50 hover:text-cyan-100" target="_blank" rel="noreferrer">
+          <i data-lucide="database" class="h-3.5 w-3.5"></i>
+          Source API
+        </a>
+      </section>
+
+      <section id="catalog" class="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3"></section>
+      <div class="mt-5 flex justify-center">
+        <button id="load-more" class="hidden h-11 items-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-4 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/50 hover:text-cyan-100">
+          <i data-lucide="plus" class="h-4 w-4"></i>
+          Load More
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <template id="part-card-template">
+    <article class="card overflow-hidden">
+      <div class="border-b border-slate-700/60 p-4">
+        <div class="preview-shell">
+          <img class="part-image" alt="" loading="lazy" referrerpolicy="no-referrer">
+          <canvas class="preview-canvas" aria-hidden="true"></canvas>
+          <div class="absolute left-3 top-3 rounded border border-slate-600 bg-black/45 px-2 py-1 text-[10px] uppercase text-slate-300">CAD Preview</div>
+          <a class="image-link absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-md border border-slate-600 bg-black/45 text-slate-300 hover:border-cyan-300/50 hover:text-cyan-100" target="_blank" rel="noreferrer" title="Open image source">
+            <i data-lucide="image" class="h-4 w-4"></i>
+          </a>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2 text-xs">
+          <a class="source-link inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-950/70 px-2 py-1 text-slate-300 hover:border-cyan-300/50 hover:text-cyan-100" target="_blank" rel="noreferrer">
+            <i data-lucide="external-link" class="h-3.5 w-3.5"></i>
+            CAD Source
+          </a>
+          <span class="format-pill rounded border border-slate-700 bg-slate-950/70 px-2 py-1 text-slate-400"></span>
+        </div>
+      </div>
+      <div class="flex min-h-[27rem] flex-col p-4">
+        <div class="mb-3 flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="part-name text-lg font-semibold leading-tight text-white"></h2>
+            <p class="part-summary mt-1 line-clamp-2 text-sm leading-5 text-slate-400"></p>
+          </div>
+          <span class="category-tag shrink-0 rounded border px-2 py-1 text-[11px] font-medium uppercase"></span>
+        </div>
+        <div class="specs mb-4 rounded-md border border-slate-700/70 bg-black/20 px-3 py-2 text-sm"></div>
+        <div class="competition-tags mb-4 flex flex-wrap gap-1.5"></div>
+        <button class="download-btn mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-md border border-cyan-300/50 bg-cyan-300/12 px-4 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-300/20">
+          <i data-lucide="download" class="h-4 w-4"></i>
+          Download Smart CAD Package
+        </button>
+      </div>
+    </article>
+  </template>
+
+  <script>
+    const state = { parts: [], categories: [], filter: 'All', query: '', visible: 72 };
+    const PAGE_SIZE = 72;
+    const catalog = document.querySelector('#catalog');
+    const filters = document.querySelector('#filters');
+    const template = document.querySelector('#part-card-template');
+    const search = document.querySelector('#search');
+    const resultCount = document.querySelector('#result-count');
+    const loadMore = document.querySelector('#load-more');
+    const canvases = new Map();
+
+    const palette = [
+      ['#35d6c8', 'rgba(53, 214, 200, 0.09)'],
+      ['#b8f36d', 'rgba(184, 243, 109, 0.09)'],
+      ['#f5b74f', 'rgba(245, 183, 79, 0.09)'],
+      ['#f472b6', 'rgba(244, 114, 182, 0.09)'],
+      ['#7dd3fc', 'rgba(125, 211, 252, 0.09)'],
+      ['#c4b5fd', 'rgba(196, 181, 253, 0.08)'],
+      ['#fb7185', 'rgba(251, 113, 133, 0.08)'],
+      ['#a3e635', 'rgba(163, 230, 53, 0.08)']
+    ];
+
+    function colorFor(value) {
+      let hash = 0;
+      for (const char of value) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+      return palette[hash % palette.length];
+    }
+
+    function specRow(label, value) {
+      return `<div class="spec-row"><dt class="text-xs uppercase text-slate-500">${label}</dt><dd class="min-w-0 break-words text-slate-200">${value}</dd></div>`;
+    }
+
+    function vector(com = {}) {
+      const x = Number(com.x || 0).toFixed(1);
+      const y = Number(com.y || 0).toFixed(1);
+      const z = Number(com.z || 0).toFixed(1);
+      return `${x}, ${y}, ${z} mm`;
+    }
+
+    function materialLabel(items = []) {
+      return items.slice(0, 2).map((item) => item.material).join(' / ') || 'Material metadata pending';
+    }
+
+    function motionLabel(motion = {}) {
+      const rpm = motion.max_rotational_velocity_rpm;
+      if (Number(rpm) > 0) {
+        const torque = motion.holding_torque_nm ?? motion.peak_torque_nm ?? motion.rated_torque_nm;
+        return `${Number(rpm).toLocaleString()} rpm${torque ? `, ${torque} N*m` : ''}`;
+      }
+      if (motion.stroke_mm) return `${motion.stroke_mm} mm stroke, ${motion.max_linear_velocity_mm_s || 0} mm/s`;
+      if (motion.rated_static_load_n) return `${Number(motion.rated_static_load_n).toLocaleString()} N static load`;
+      return 'Fixed body';
+    }
+
+    function constraintLabel(constraint = {}) {
+      if (!constraint.type) return 'Assembly constraint pending';
+      if (Array.isArray(constraint.limits_mm)) return `${constraint.type.replaceAll('_', ' ')}, ${constraint.limits_mm.join(' to ')} mm`;
+      if (Array.isArray(constraint.limits_degrees)) return `${constraint.type.replaceAll('_', ' ')}, ${constraint.limits_degrees.join(' to ')} deg`;
+      return `${constraint.type.replaceAll('_', ' ')}, continuous`;
+    }
+
+    function renderFilters() {
+      filters.innerHTML = '';
+      ['All', ...state.categories].forEach((category) => {
+        const button = document.createElement('button');
+        const count = category === 'All' ? state.parts.length : state.parts.filter((part) => part.category === category).length;
+        const [stroke, fill] = colorFor(category);
+        button.dataset.filter = category;
+        button.className = 'filter-btn shrink-0 rounded-md border px-3 py-2 text-sm transition';
+        button.style.borderColor = state.filter === category ? stroke : 'rgba(51, 65, 85, 0.95)';
+        button.style.background = state.filter === category ? fill : 'rgba(2, 6, 23, 0.72)';
+        button.style.color = state.filter === category ? '#f8fafc' : '#cbd5e1';
+        button.innerHTML = `<span>${category}</span><span class="ml-2 text-xs text-slate-500">${count}</span>`;
+        button.addEventListener('click', () => {
+          state.filter = category;
+          state.visible = PAGE_SIZE;
+          renderFilters();
+          render();
+        });
+        filters.appendChild(button);
+      });
+    }
+
+    function filteredParts() {
+      const query = state.query.trim().toLowerCase();
+      return state.parts.filter((part) => {
+        const matchesCategory = state.filter === 'All' || part.category === state.filter;
+        if (!matchesCategory) return false;
+        if (!query) return true;
+        return JSON.stringify(part).toLowerCase().includes(query);
+      });
+    }
+
+    function render() {
+      const parts = filteredParts();
+      const visibleParts = parts.slice(0, state.visible);
+      catalog.innerHTML = '';
+      canvases.clear();
+      resultCount.textContent = `Showing ${visibleParts.length.toLocaleString()} of ${parts.length.toLocaleString()} parts`;
+      loadMore.classList.toggle('hidden', visibleParts.length >= parts.length);
+      loadMore.classList.toggle('inline-flex', visibleParts.length < parts.length);
+      visibleParts.forEach((part) => {
+        const node = template.content.cloneNode(true);
+        const canvas = node.querySelector('canvas');
+        const tag = node.querySelector('.category-tag');
+        const [stroke, fill] = colorFor(part.category);
+
+        node.querySelector('.part-name').textContent = part.name;
+        node.querySelector('.part-summary').textContent = part.summary;
+        tag.textContent = part.category;
+        tag.style.color = stroke;
+        tag.style.borderColor = `${stroke}88`;
+        tag.style.background = fill;
+
+        const image = node.querySelector('.part-image');
+        image.alt = part.media?.alt || `${part.name} image`;
+        if (part.media?.image_url) {
+          image.src = part.media.image_url;
+          image.addEventListener('error', () => { image.style.display = 'none'; });
+        } else {
+          image.removeAttribute('src');
+          image.style.display = 'none';
+        }
+
+        node.querySelector('.image-link').href = part.media?.image_source || part.media?.image_url || part.cad.source_page;
+        node.querySelector('.source-link').href = part.cad.source_page;
+        node.querySelector('.format-pill').textContent = `${part.cad.format} | ${part.cad.repository}`;
+        node.querySelector('.specs').innerHTML = [
+          specRow('Mass', `${part.physics.mass_grams} g`),
+          specRow('Materials', materialLabel(part.physics.material_composition)),
+          specRow('Center Of Mass', vector(part.physics.center_of_mass_mm)),
+          specRow('Motion', motionLabel(part.physics.motion)),
+          specRow('Constraint', constraintLabel(part.physics.joint_constraints?.[0]))
+        ].join('');
+
+        const tagWrap = node.querySelector('.competition-tags');
+        (part.competition_relevance || []).slice(0, 4).forEach((item) => {
+          const chip = document.createElement('span');
+          chip.className = 'rounded border border-slate-700 bg-slate-950/70 px-2 py-1 text-[11px] text-slate-300';
+          chip.textContent = item;
+          tagWrap.appendChild(chip);
+        });
+
+        node.querySelector('.download-btn').addEventListener('click', () => {
+          window.location.href = `/api/parts/${part.id}/smart-package`;
+        });
+
+        catalog.appendChild(node);
+        canvases.set(canvas, part);
+        observeCanvas(canvas);
+      });
+      if (window.lucide) window.lucide.createIcons();
+      requestAnimationFrame(drawAllCanvases);
+    }
+
+    function resizeCanvas(canvas) {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+      canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+      return ratio;
+    }
+
+    function observeCanvas(canvas) {
+      const observer = new ResizeObserver(() => {
+        resizeCanvas(canvas);
+        drawWireframe(canvas, canvases.get(canvas));
+      });
+      observer.observe(canvas);
+      resizeCanvas(canvas);
+    }
+
+    function drawAllCanvases() {
+      canvases.forEach((part, canvas) => drawWireframe(canvas, part));
+    }
+
+    function drawWireframe(canvas, part) {
+      if (!part) return;
+      const ctx = canvas.getContext('2d');
+      const ratio = window.devicePixelRatio || 1;
+      const width = canvas.width / ratio;
+      const height = canvas.height / ratio;
+      const [stroke] = colorFor(part.category);
+      ctx.save();
+      ctx.scale(ratio, ratio);
+      ctx.clearRect(0, 0, width, height);
+      ctx.translate(width / 2, height / 2);
+      ctx.lineWidth = 1.25;
+      ctx.strokeStyle = stroke;
+      ctx.shadowColor = stroke;
+      ctx.shadowBlur = 7;
+      const size = Math.min(width, height);
+      const category = part.category.toLowerCase();
+      if (category.includes('bearing')) drawBearing(ctx, size * 0.22);
+      else if (category.includes('structural')) drawFrame(ctx, size * 0.28);
+      else if (category.includes('transmission')) drawTransmission(ctx, size * 0.24);
+      else if (category.includes('electronics') || category.includes('sensor')) drawBoard(ctx, size * 0.34);
+      else if (category.includes('pneumatic')) drawCylinder(ctx, size * 0.32);
+      else drawMotor(ctx, size * 0.25);
+      ctx.restore();
+    }
+
+    function ellipse(ctx, rx, ry, y = 0) {
+      ctx.beginPath();
+      ctx.ellipse(0, y, rx, ry, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function drawBearing(ctx, radius) {
+      ellipse(ctx, radius, radius * 0.52);
+      ellipse(ctx, radius * 0.56, radius * 0.28);
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * radius * 0.72, Math.sin(a) * radius * 0.35, radius * 0.075, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    function drawFrame(ctx, radius) {
+      const s = radius * 0.72;
+      ctx.strokeRect(-s, -s, s * 2, s * 2);
+      ctx.strokeRect(-s * 0.45, -s * 0.45, s * 0.9, s * 0.9);
+      for (const angle of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
+        ctx.save();
+        ctx.rotate(angle);
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.18, -s);
+        ctx.lineTo(-s * 0.18, -s * 0.48);
+        ctx.lineTo(s * 0.18, -s * 0.48);
+        ctx.lineTo(s * 0.18, -s);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    function drawTransmission(ctx, radius) {
+      ellipse(ctx, radius, radius);
+      ellipse(ctx, radius * 0.34, radius * 0.34);
+      for (let i = 0; i < 18; i++) {
+        const a = i * Math.PI * 2 / 18;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * radius * 0.82, Math.sin(a) * radius * 0.82);
+        ctx.lineTo(Math.cos(a) * radius * 1.05, Math.sin(a) * radius * 1.05);
+        ctx.stroke();
+      }
+    }
+
+    function drawBoard(ctx, radius) {
+      ctx.strokeRect(-radius, -radius * 0.58, radius * 2, radius * 1.16);
+      for (let i = 0; i < 6; i++) {
+        ctx.beginPath();
+        ctx.arc(-radius * 0.72 + i * radius * 0.29, -radius * 0.36, radius * 0.04, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.strokeRect(radius * 0.12, -radius * 0.18, radius * 0.48, radius * 0.34);
+      ctx.strokeRect(-radius * 0.62, radius * 0.1, radius * 0.44, radius * 0.26);
+    }
+
+    function drawCylinder(ctx, radius) {
+      ctx.strokeRect(-radius, -radius * 0.2, radius * 1.35, radius * 0.4);
+      ellipse(ctx, radius * 0.22, radius * 0.2, 0);
+      ctx.beginPath();
+      ctx.moveTo(radius * 0.35, 0);
+      ctx.lineTo(radius * 1.28, 0);
+      ctx.stroke();
+      ctx.strokeRect(radius * 1.28, -radius * 0.1, radius * 0.28, radius * 0.2);
+    }
+
+    function drawMotor(ctx, radius) {
+      ellipse(ctx, radius, radius * 0.54, 8);
+      ellipse(ctx, radius * 0.78, radius * 0.4, -10);
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.75, -10);
+      ctx.lineTo(-radius * 0.9, 10);
+      ctx.moveTo(radius * 0.75, -10);
+      ctx.lineTo(radius * 0.9, 10);
+      ctx.moveTo(0, -radius * 0.92);
+      ctx.lineTo(0, -radius * 0.36);
+      ctx.stroke();
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI * 2 / 6;
+        ctx.beginPath();
+        ctx.moveTo(0, -2);
+        ctx.lineTo(Math.cos(a) * radius * 0.6, Math.sin(a) * radius * 0.28 - 2);
+        ctx.stroke();
+      }
+    }
+
+    search.addEventListener('input', (event) => {
+      state.query = event.target.value;
+      state.visible = PAGE_SIZE;
+      render();
+    });
+    loadMore.addEventListener('click', () => {
+      state.visible += PAGE_SIZE;
+      render();
+    });
+
+    fetch('/api/parts')
+      .then((response) => response.json())
+      .then((data) => {
+        state.parts = data.parts;
+        state.categories = data.categories || [...new Set(data.parts.map((part) => part.category))].sort();
+        document.querySelector('#stat-models').textContent = data.count.toLocaleString();
+        document.querySelector('#stat-categories').textContent = state.categories.length.toLocaleString();
+        document.querySelector('#stat-images').textContent = data.parts.filter((part) => part.media?.image_url).length.toLocaleString();
+        renderFilters();
+        render();
+      })
+      .catch(() => {
+        resultCount.textContent = 'Catalog API unavailable';
+        catalog.innerHTML = '<div class="card p-5 text-sm text-amber-100">Catalog API unavailable.</div>';
+      });
+
+    if (window.lucide) window.lucide.createIcons();
+  </script>
+</body>
+</html>
