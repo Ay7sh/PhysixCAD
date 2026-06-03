@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PhysixCAD Smart CAD Marketplace</title>
+  <link rel="icon" type="image/png" href="/static/assets/physixcad-logo-mark.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script type="module">
@@ -38,6 +39,13 @@
       letter-spacing: 0;
     }
     button, input { letter-spacing: 0; }
+    .brand-logo {
+      width: clamp(11rem, 17vw, 15rem);
+      max-height: 4.2rem;
+      object-fit: contain;
+      object-position: left center;
+      filter: drop-shadow(0 0 18px rgba(53, 214, 200, 0.18));
+    }
     .glass {
       border: 1px solid var(--line);
       background: rgba(8, 13, 18, 0.78);
@@ -153,12 +161,10 @@
     <header class="glass sticky top-3 z-20 mb-5 rounded-lg px-4 py-3">
       <div class="grid gap-4 lg:grid-cols-[auto_1fr_auto] lg:items-center">
         <div class="flex items-center gap-3">
-          <div class="grid h-10 w-10 place-items-center rounded-md border border-cyan-300/40 bg-cyan-300/10">
-            <i data-lucide="cuboid" class="h-5 w-5 text-cyan-200"></i>
-          </div>
           <div>
-            <h1 class="text-xl font-semibold text-white">PhysixCAD</h1>
-            <p class="text-xs uppercase text-slate-400">Smart CAD Marketplace</p>
+            <img src="/static/assets/physixcad-logo.png" alt="PhysixCAD" class="brand-logo">
+            <h1 class="sr-only">PhysixCAD</h1>
+            <p class="-mt-1 text-xs uppercase text-slate-400">Smart CAD Marketplace</p>
             <div class="mt-2 inline-flex items-center gap-2 rounded-md border border-lime-300/30 bg-lime-300/10 px-2 py-1 text-xs text-lime-100">
               <span class="online-dot h-2 w-2 rounded-full bg-lime-300"></span>
               <strong id="online-count" class="text-white">0</strong>
