@@ -103,6 +103,21 @@
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
+    .online-dot {
+      position: relative;
+      box-shadow: 0 0 0 4px rgba(184, 243, 109, 0.08);
+    }
+    .online-dot::after {
+      content: "";
+      position: absolute;
+      inset: -5px;
+      border-radius: 999px;
+      border: 1px solid rgba(184, 243, 109, 0.35);
+      animation: ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+    }
+    @keyframes ping {
+      75%, 100% { transform: scale(1.9); opacity: 0; }
+    }
   </style>
 </head>
 <body>
@@ -116,6 +131,11 @@
           <div>
             <h1 class="text-xl font-semibold text-white">PhysixCAD</h1>
             <p class="text-xs uppercase text-slate-400">Smart CAD Marketplace</p>
+            <div class="mt-2 inline-flex items-center gap-2 rounded-md border border-lime-300/30 bg-lime-300/10 px-2 py-1 text-xs text-lime-100">
+              <span class="online-dot h-2 w-2 rounded-full bg-lime-300"></span>
+              <strong id="online-count" class="text-white">0</strong>
+              <span>online now</span>
+            </div>
           </div>
         </div>
         <div class="relative">
@@ -159,6 +179,34 @@
           Load More
         </button>
       </div>
+
+      <section id="about" class="mt-8 border-t border-slate-700/70 py-7">
+        <div class="grid gap-4 md:grid-cols-[0.9fr_1.4fr] md:items-start">
+          <div>
+            <p class="text-xs font-semibold uppercase text-cyan-200">About Us</p>
+            <h2 class="mt-2 text-2xl font-semibold text-white">Built for simulation-ready engineering</h2>
+          </div>
+          <div class="glass rounded-lg p-5">
+            <p class="text-sm leading-6 text-slate-300">
+              PhysixCAD is founded and led by <strong class="text-white">Ayush Parekh</strong>, Founder and CEO. The platform helps students, robotics teams, competition builders, and professional engineers find CAD models that already include practical physics metadata for faster simulation in Unity, Unreal Engine, MATLAB, and custom digital twin workflows.
+            </p>
+            <div class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+              <div class="rounded-md border border-slate-700/80 bg-slate-950/60 px-3 py-2">
+                <span class="block text-xs uppercase text-slate-500">Founder</span>
+                <strong class="text-white">Ayush Parekh</strong>
+              </div>
+              <div class="rounded-md border border-slate-700/80 bg-slate-950/60 px-3 py-2">
+                <span class="block text-xs uppercase text-slate-500">Role</span>
+                <strong class="text-white">Founder &amp; CEO</strong>
+              </div>
+              <div class="rounded-md border border-slate-700/80 bg-slate-950/60 px-3 py-2">
+                <span class="block text-xs uppercase text-slate-500">Mission</span>
+                <strong class="text-white">Smart CAD access</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -190,6 +238,32 @@
           <span class="category-tag shrink-0 rounded border px-2 py-1 text-[11px] font-medium uppercase"></span>
         </div>
         <div class="specs mb-4 rounded-md border border-slate-700/70 bg-black/20 px-3 py-2 text-sm"></div>
+        <div class="vote-panel mb-4 rounded-md border border-slate-700/70 bg-slate-950/50 p-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase text-slate-500">Community Verification</p>
+              <p class="vote-status mt-1 text-sm font-semibold text-white">Unverified</p>
+              <p class="vote-total mt-0.5 text-xs text-slate-500">0 community votes</p>
+            </div>
+            <div class="rounded-md border border-slate-700 bg-black/30 px-2 py-1 text-right">
+              <span class="block text-[10px] uppercase text-slate-500">Score</span>
+              <strong class="vote-score text-base text-white">0</strong>
+            </div>
+          </div>
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <button class="vote-btn vote-up inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-700 bg-black/20 px-2 text-xs font-semibold text-slate-200 transition hover:border-lime-300/50 hover:text-lime-100" data-vote="genuine" type="button" aria-pressed="false">
+              <i data-lucide="thumbs-up" class="h-3.5 w-3.5"></i>
+              Genuine
+              <span class="up-count rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">0</span>
+            </button>
+            <button class="vote-btn vote-down inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-700 bg-black/20 px-2 text-xs font-semibold text-slate-200 transition hover:border-rose-300/50 hover:text-rose-100" data-vote="not_genuine" type="button" aria-pressed="false">
+              <i data-lucide="thumbs-down" class="h-3.5 w-3.5"></i>
+              Not Genuine
+              <span class="down-count rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">0</span>
+            </button>
+          </div>
+          <p class="vote-confidence mt-2 text-xs text-slate-500">No votes yet</p>
+        </div>
         <div class="competition-tags mb-4 flex flex-wrap gap-1.5"></div>
         <button class="download-btn mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-md border border-cyan-300/50 bg-cyan-300/12 px-4 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-300/20">
           <i data-lucide="download" class="h-4 w-4"></i>
@@ -200,7 +274,28 @@
   </template>
 
   <script>
-    const state = { parts: [], categories: [], filter: 'All', query: '', visible: 72 };
+    function getClientId() {
+      try {
+        const existing = localStorage.getItem('physixcad_client_id');
+        if (existing) return existing;
+        const generated = `pcad-${crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
+        localStorage.setItem('physixcad_client_id', generated);
+        return generated;
+      } catch {
+        return `pcad-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      }
+    }
+
+    const state = {
+      parts: [],
+      categories: [],
+      filter: 'All',
+      query: '',
+      visible: 72,
+      votes: {},
+      userVotes: {},
+      clientId: getClientId()
+    };
     const PAGE_SIZE = 72;
     const catalog = document.querySelector('#catalog');
     const filters = document.querySelector('#filters');
@@ -208,6 +303,7 @@
     const search = document.querySelector('#search');
     const resultCount = document.querySelector('#result-count');
     const loadMore = document.querySelector('#load-more');
+    const onlineCount = document.querySelector('#online-count');
     const canvases = new Map();
 
     const palette = [
@@ -258,6 +354,89 @@
       if (Array.isArray(constraint.limits_mm)) return `${constraint.type.replaceAll('_', ' ')}, ${constraint.limits_mm.join(' to ')} mm`;
       if (Array.isArray(constraint.limits_degrees)) return `${constraint.type.replaceAll('_', ' ')}, ${constraint.limits_degrees.join(' to ')} deg`;
       return `${constraint.type.replaceAll('_', ' ')}, continuous`;
+    }
+
+    function defaultVoteSummary() {
+      return {
+        upvotes: 0,
+        downvotes: 0,
+        score: 0,
+        total: 0,
+        genuine_percent: null,
+        label: 'Unverified'
+      };
+    }
+
+    function voteSummary(partId) {
+      return state.votes[partId] || defaultVoteSummary();
+    }
+
+    function formatScore(score) {
+      return score > 0 ? `+${score}` : String(score);
+    }
+
+    function applyVoteButtonStyle(button, selected, voteType) {
+      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      if (selected && voteType === 'genuine') {
+        button.style.borderColor = 'rgba(184, 243, 109, 0.72)';
+        button.style.background = 'rgba(184, 243, 109, 0.13)';
+        button.style.color = '#ecfccb';
+      } else if (selected) {
+        button.style.borderColor = 'rgba(253, 164, 175, 0.72)';
+        button.style.background = 'rgba(253, 164, 175, 0.13)';
+        button.style.color = '#ffe4e6';
+      } else {
+        button.style.borderColor = 'rgba(51, 65, 85, 1)';
+        button.style.background = 'rgba(0, 0, 0, 0.2)';
+        button.style.color = '#e2e8f0';
+      }
+    }
+
+    function updateVoteElements(panel, partId) {
+      const summary = voteSummary(partId);
+      const userVote = state.userVotes[partId];
+      panel.querySelector('.vote-status').textContent = summary.label;
+      panel.querySelector('.vote-total').textContent = `${summary.total.toLocaleString()} community ${summary.total === 1 ? 'vote' : 'votes'}`;
+      panel.querySelector('.vote-score').textContent = formatScore(summary.score);
+      panel.querySelector('.up-count').textContent = summary.upvotes.toLocaleString();
+      panel.querySelector('.down-count').textContent = summary.downvotes.toLocaleString();
+      panel.querySelector('.vote-confidence').textContent = summary.total
+        ? `${summary.genuine_percent}% of voters marked this model as genuine`
+        : 'No votes yet';
+
+      panel.querySelectorAll('.vote-btn').forEach((button) => {
+        applyVoteButtonStyle(button, userVote === button.dataset.vote, button.dataset.vote);
+      });
+    }
+
+    async function submitVote(partId, vote, panel) {
+      const buttons = panel.querySelectorAll('.vote-btn');
+      buttons.forEach((button) => { button.disabled = true; });
+      try {
+        const response = await fetch(`/api/parts/${encodeURIComponent(partId)}/vote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voter_id: state.clientId, vote })
+        });
+        if (!response.ok) throw new Error('Vote request failed');
+        const data = await response.json();
+        state.votes[partId] = data.votes;
+        state.userVotes[partId] = data.user_vote;
+        updateVoteElements(panel, partId);
+      } catch {
+        panel.querySelector('.vote-status').textContent = 'Vote unavailable';
+        panel.querySelector('.vote-confidence').textContent = 'Try again after the API is reachable.';
+      } finally {
+        buttons.forEach((button) => { button.disabled = false; });
+      }
+    }
+
+    function bindVotePanel(panel, partId) {
+      panel.dataset.partId = partId;
+      panel.querySelectorAll('.vote-btn').forEach((button) => {
+        button.addEventListener('click', () => submitVote(partId, button.dataset.vote, panel));
+      });
+      updateVoteElements(panel, partId);
     }
 
     function renderFilters() {
@@ -333,6 +512,7 @@
           specRow('Motion', motionLabel(part.physics.motion)),
           specRow('Constraint', constraintLabel(part.physics.joint_constraints?.[0]))
         ].join('');
+        bindVotePanel(node.querySelector('.vote-panel'), part.id);
 
         const tagWrap = node.querySelector('.competition-tags');
         (part.competition_relevance || []).slice(0, 4).forEach((item) => {
@@ -488,6 +668,22 @@
       }
     }
 
+    async function sendPresenceHeartbeat() {
+      try {
+        const response = await fetch('/api/presence/heartbeat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: state.clientId }),
+          keepalive: true
+        });
+        if (!response.ok) throw new Error('Presence request failed');
+        const data = await response.json();
+        onlineCount.textContent = Number(data.online_count || 0).toLocaleString();
+      } catch {
+        onlineCount.textContent = '-';
+      }
+    }
+
     search.addEventListener('input', (event) => {
       state.query = event.target.value;
       state.visible = PAGE_SIZE;
@@ -498,11 +694,17 @@
       render();
     });
 
-    fetch('/api/parts')
-      .then((response) => response.json())
-      .then((data) => {
+    const partsRequest = fetch('/api/parts').then((response) => response.json());
+    const votesRequest = fetch(`/api/votes?voter_id=${encodeURIComponent(state.clientId)}`)
+      .then((response) => response.ok ? response.json() : { votes: {}, user_votes: {} })
+      .catch(() => ({ votes: {}, user_votes: {} }));
+
+    Promise.all([partsRequest, votesRequest])
+      .then(([data, voteData]) => {
         state.parts = data.parts;
         state.categories = data.categories || [...new Set(data.parts.map((part) => part.category))].sort();
+        state.votes = voteData.votes || {};
+        state.userVotes = voteData.user_votes || {};
         document.querySelector('#stat-models').textContent = data.count.toLocaleString();
         document.querySelector('#stat-categories').textContent = state.categories.length.toLocaleString();
         document.querySelector('#stat-images').textContent = data.parts.filter((part) => part.media?.image_url).length.toLocaleString();
@@ -513,6 +715,12 @@
         resultCount.textContent = 'Catalog API unavailable';
         catalog.innerHTML = '<div class="card p-5 text-sm text-amber-100">Catalog API unavailable.</div>';
       });
+
+    sendPresenceHeartbeat();
+    setInterval(sendPresenceHeartbeat, 15000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') sendPresenceHeartbeat();
+    });
 
     if (window.lucide) window.lucide.createIcons();
   </script>

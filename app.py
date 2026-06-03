@@ -8,6 +8,7 @@ import time
 import zipfile
 from io import BytesIO
 from pathlib import Path
+from threading import Lock
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -16,12 +17,19 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from source_pipeline import run_pipeline
 
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
 DATABASE_PATH = ROOT / "database.json"
+VOTES_PATH = ROOT / "votes.json"
+PRESENCE_TIMEOUT_SECONDS = 45.0
+
+vote_lock = Lock()
+presence_lock = Lock()
+active_clients: dict[str, float] = {}
 
 app = FastAPI(
     title="PhysixCAD MVP API",
@@ -32,10 +40,19 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+class VoteRequest(BaseModel):
+    voter_id: str
+    vote: str
+
+
+class PresenceRequest(BaseModel):
+    client_id: str
 
 
 def load_database() -> dict[str, Any]:
@@ -56,6 +73,71 @@ def get_part(part_id: str) -> dict[str, Any]:
 
 def safe_package_name(value: str) -> str:
     return re.sub(r"[^a-zA-Z0-9._-]+", "-", value).strip("-").lower()
+
+
+def utc_timestamp() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def clean_client_id(client_id: str) -> str:
+    client_id = str(client_id).strip()
+    if not re.fullmatch(r"[a-zA-Z0-9._:-]{8,96}", client_id):
+        raise HTTPException(status_code=400, detail="Invalid anonymous client id.")
+    return client_id
+
+
+def load_vote_store() -> dict[str, Any]:
+    if not VOTES_PATH.exists():
+        return {"parts": {}, "created_at": utc_timestamp(), "updated_at": utc_timestamp()}
+    with VOTES_PATH.open("r", encoding="utf-8") as fp:
+        return json.load(fp)
+
+
+def save_vote_store(store: dict[str, Any]) -> None:
+    store["updated_at"] = utc_timestamp()
+    temp_path = VOTES_PATH.with_suffix(".json.tmp")
+    with temp_path.open("w", encoding="utf-8") as fp:
+        json.dump(store, fp, indent=2, sort_keys=True)
+        fp.write("\n")
+    temp_path.replace(VOTES_PATH)
+
+
+def summarize_vote_record(record: dict[str, Any] | None) -> dict[str, Any]:
+    voters = (record or {}).get("voters", {})
+    upvotes = sum(1 for vote in voters.values() if vote == "genuine")
+    downvotes = sum(1 for vote in voters.values() if vote == "not_genuine")
+    total = upvotes + downvotes
+    score = upvotes - downvotes
+    if total == 0:
+        label = "Unverified"
+        genuine_percent = None
+    elif score >= 0:
+        label = "Community says genuine"
+        genuine_percent = round((upvotes / total) * 100)
+    else:
+        label = "Needs review"
+        genuine_percent = round((upvotes / total) * 100)
+    return {
+        "upvotes": upvotes,
+        "downvotes": downvotes,
+        "score": score,
+        "total": total,
+        "genuine_percent": genuine_percent,
+        "label": label,
+        "updated_at": (record or {}).get("updated_at"),
+    }
+
+
+def prune_presence(now: float | None = None) -> int:
+    now = now or time.monotonic()
+    expired = [
+        client_id
+        for client_id, last_seen in active_clients.items()
+        if now - last_seen > PRESENCE_TIMEOUT_SECONDS
+    ]
+    for client_id in expired:
+        active_clients.pop(client_id, None)
+    return len(active_clients)
 
 
 def fetch_remote_asset(url: str, timeout_seconds: float = 15.0) -> tuple[bytes, dict[str, Any]]:
@@ -453,6 +535,71 @@ def api_part_cad(part_id: str):
             headers={"Content-Disposition": f'attachment; filename="{part["cad"]["filename"]}"'},
         )
     return RedirectResponse(part["cad"]["download_url"])
+
+
+@app.get("/api/votes")
+def api_votes(voter_id: str | None = Query(None, description="Anonymous browser id for returning this user's votes.")) -> dict[str, Any]:
+    cleaned_voter_id = clean_client_id(voter_id) if voter_id else None
+    with vote_lock:
+        store = load_vote_store()
+        part_records = store.get("parts", {})
+        summaries = {
+            part_id: summarize_vote_record(record)
+            for part_id, record in part_records.items()
+        }
+        user_votes = {}
+        if cleaned_voter_id:
+            user_votes = {
+                part_id: record.get("voters", {}).get(cleaned_voter_id)
+                for part_id, record in part_records.items()
+                if record.get("voters", {}).get(cleaned_voter_id)
+            }
+    return {"count": len(summaries), "votes": summaries, "user_votes": user_votes}
+
+
+@app.get("/api/parts/{part_id}/votes")
+def api_part_votes(part_id: str) -> dict[str, Any]:
+    get_part(part_id)
+    with vote_lock:
+        store = load_vote_store()
+        record = store.get("parts", {}).get(part_id)
+        summary = summarize_vote_record(record)
+    return {"part_id": part_id, "votes": summary}
+
+
+@app.post("/api/parts/{part_id}/vote")
+def api_part_vote(part_id: str, payload: VoteRequest) -> dict[str, Any]:
+    get_part(part_id)
+    voter_id = clean_client_id(payload.voter_id)
+    if payload.vote not in {"genuine", "not_genuine"}:
+        raise HTTPException(status_code=400, detail="Vote must be genuine or not_genuine.")
+
+    with vote_lock:
+        store = load_vote_store()
+        part_records = store.setdefault("parts", {})
+        record = part_records.setdefault(part_id, {"voters": {}, "created_at": utc_timestamp()})
+        record.setdefault("voters", {})[voter_id] = payload.vote
+        record["updated_at"] = utc_timestamp()
+        save_vote_store(store)
+        summary = summarize_vote_record(record)
+
+    return {"part_id": part_id, "votes": summary, "user_vote": payload.vote}
+
+
+@app.get("/api/presence")
+def api_presence() -> dict[str, Any]:
+    with presence_lock:
+        online_count = prune_presence()
+    return {"online_count": online_count, "timeout_seconds": PRESENCE_TIMEOUT_SECONDS}
+
+
+@app.post("/api/presence/heartbeat")
+def api_presence_heartbeat(payload: PresenceRequest) -> dict[str, Any]:
+    client_id = clean_client_id(payload.client_id)
+    with presence_lock:
+        active_clients[client_id] = time.monotonic()
+        online_count = prune_presence()
+    return {"online_count": online_count, "timeout_seconds": PRESENCE_TIMEOUT_SECONDS}
 
 
 @app.get("/api/source-pipeline")

@@ -18,8 +18,13 @@ Open <http://127.0.0.1:8000>.
 - `GET /api/parts` returns the full 10,000-part marketplace catalog, category list, media metadata, CAD links, and physics metadata.
 - `GET /api/parts/{part_id}` returns one digital twin.
 - `GET /api/parts/{part_id}/smart-package` downloads a ZIP with CAD plus `physics/metadata.json`.
+- `GET /api/votes` returns community verification totals for CAD authenticity.
+- `POST /api/parts/{part_id}/vote` records an anonymous browser vote: `genuine` or `not_genuine`.
+- `POST /api/presence/heartbeat` updates the live online-user counter shown in the header.
 - `GET /api/source-pipeline?limit=20` lists public CAD sources.
 - `GET /api/source-pipeline?validate=true&limit=10` validates a limited set of remote CAD URLs.
+
+Community verification votes are stored in `votes.json` on the running server. The online counter uses browser heartbeats and expires inactive clients after 45 seconds.
 
 ## Catalog Expansion
 
