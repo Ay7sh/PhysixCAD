@@ -21,10 +21,15 @@ Open <http://127.0.0.1:8000>.
 - `GET /api/votes` returns community verification totals for CAD authenticity.
 - `POST /api/parts/{part_id}/vote` records an anonymous browser vote: `genuine` or `not_genuine`.
 - `POST /api/presence/heartbeat` updates the live online-user counter shown in the header.
+- `GET /api/collections` returns competition and engineering collections.
+- `GET /api/parts/{part_id}/export/{engine}` downloads Unity, Unreal, MATLAB, or ROS/Gazebo physics presets.
+- `POST /api/parts/{part_id}/report` stores model quality reports.
+- `POST /api/uploads` adds a community-submitted Smart CAD model.
+- `GET /api/admin/stats` returns MVP admin dashboard metrics.
 - `GET /api/source-pipeline?limit=20` lists public CAD sources.
 - `GET /api/source-pipeline?validate=true&limit=10` validates a limited set of remote CAD URLs.
 
-Community verification votes are stored in `votes.json` on the running server. The online counter uses browser heartbeats and expires inactive clients after 45 seconds.
+Community verification votes are stored in `votes.json` on the running server. Reports and uploads are stored in `reports.json` and `uploads.json`. The online counter uses browser heartbeats and expires inactive clients after 45 seconds.
 
 ## Catalog Expansion
 

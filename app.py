@@ -25,11 +25,66 @@ ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
 DATABASE_PATH = ROOT / "database.json"
 VOTES_PATH = ROOT / "votes.json"
+REPORTS_PATH = ROOT / "reports.json"
+UPLOADS_PATH = ROOT / "uploads.json"
 PRESENCE_TIMEOUT_SECONDS = 45.0
 
 vote_lock = Lock()
+report_lock = Lock()
+upload_lock = Lock()
 presence_lock = Lock()
 active_clients: dict[str, float] = {}
+
+COLLECTIONS = [
+    {
+        "id": "first-robotics-kit",
+        "name": "FIRST Robotics Kit",
+        "description": "Motors, bearings, structure, sensors, fasteners, and power transmission parts for student robotics teams.",
+        "categories": ["Actuators & Motors", "Bearings & Linear Motion", "Structural Framing", "Sensors & Switches", "Fasteners & Hardware"],
+        "keywords": ["FIRST Robotics", "Robotics Competition", "FRC", "FTC"],
+        "icon": "bot",
+    },
+    {
+        "id": "drone-racing-kit",
+        "name": "Drone Racing Kit",
+        "description": "Brushless motors, electronics, frames, shafts, fasteners, and lightweight parts for UAV builds.",
+        "categories": ["Actuators & Motors", "Electronics & Control", "Structural Framing", "Fasteners & Hardware"],
+        "keywords": ["Drone Racing", "UAV", "Aerial Robotics"],
+        "icon": "send",
+    },
+    {
+        "id": "arc-robotics-parts",
+        "name": "ARC Robotics Parts",
+        "description": "Competition-ready mechanisms for autonomous robotics, classroom teams, and rapid prototyping.",
+        "categories": ["Robotics Assemblies", "Sensors & Switches", "Actuators & Motors", "Power Transmission"],
+        "keywords": ["ARC", "Autonomous Robotics", "Robotics Competition"],
+        "icon": "cpu",
+    },
+    {
+        "id": "combat-robotics-kit",
+        "name": "Combat Robotics Kit",
+        "description": "Dense structural, drivetrain, weapon-support, bearing, and fastening models for combat robot design.",
+        "categories": ["Structural Framing", "Power Transmission", "Bearings & Linear Motion", "Fasteners & Hardware"],
+        "keywords": ["BattleBots", "Combat Robotics", "Robot Combat"],
+        "icon": "shield",
+    },
+    {
+        "id": "formula-student-kit",
+        "name": "Formula Student Kit",
+        "description": "Mechanical, sensor, fastener, fixture, and drivetrain assets for vehicle engineering teams.",
+        "categories": ["Power Transmission", "Sensors & Switches", "Tooling & Fixtures", "Fasteners & Hardware"],
+        "keywords": ["Formula Student", "SAE", "Vehicle Engineering"],
+        "icon": "gauge",
+    },
+    {
+        "id": "engineering-classroom-kit",
+        "name": "Engineering Classroom Kit",
+        "description": "General-purpose components for CAD lessons, physics labs, statics, controls, and simulation projects.",
+        "categories": ["General Engineering", "Fasteners & Hardware", "Structural Framing", "Electronics & Control"],
+        "keywords": ["Engineering Classroom", "Education", "STEM"],
+        "icon": "graduation-cap",
+    },
+]
 
 app = FastAPI(
     title="PhysixCAD MVP API",
@@ -55,13 +110,55 @@ class PresenceRequest(BaseModel):
     client_id: str
 
 
+class ReportRequest(BaseModel):
+    reporter_id: str
+    reason: str
+    detail: str = ""
+
+
+class UploadRequest(BaseModel):
+    submitter_id: str
+    name: str
+    category: str
+    summary: str = ""
+    cad_url: str
+    source_page: str = ""
+    cad_format: str = "STEP"
+    material: str = "User specified material"
+    mass_grams: float = 100.0
+    max_rpm: float = 0.0
+    torque_nm: float = 0.0
+    constraint_type: str = "fixed_body"
+    competition_relevance: list[str] = []
+
+
 def load_database() -> dict[str, Any]:
     with DATABASE_PATH.open("r", encoding="utf-8") as fp:
         return json.load(fp)
 
 
+def load_json_store(path: Path, root_key: str) -> dict[str, Any]:
+    if not path.exists():
+        return {root_key: [], "created_at": utc_timestamp(), "updated_at": utc_timestamp()}
+    with path.open("r", encoding="utf-8") as fp:
+        return json.load(fp)
+
+
+def save_json_store(path: Path, store: dict[str, Any]) -> None:
+    store["updated_at"] = utc_timestamp()
+    temp_path = path.with_suffix(".json.tmp")
+    with temp_path.open("w", encoding="utf-8") as fp:
+        json.dump(store, fp, indent=2, sort_keys=True)
+        fp.write("\n")
+    temp_path.replace(path)
+
+
+def load_uploaded_parts() -> list[dict[str, Any]]:
+    return load_json_store(UPLOADS_PATH, "uploads").get("uploads", [])
+
+
 def list_parts() -> list[dict[str, Any]]:
-    return load_database()["parts"]
+    return [*load_database()["parts"], *load_uploaded_parts()]
 
 
 def get_part(part_id: str) -> dict[str, Any]:
@@ -414,6 +511,140 @@ def fallback_dimensions(part: dict[str, Any]) -> tuple[float, float, float]:
     return (42.0, 42.0, 40.0)
 
 
+def primary_material(part: dict[str, Any]) -> str:
+    materials = part.get("physics", {}).get("material_composition", [])
+    if materials:
+        return materials[0].get("material", "Material metadata pending")
+    return "Material metadata pending"
+
+
+def clean_upload_text(value: str, fallback: str, max_length: int = 180) -> str:
+    value = re.sub(r"\s+", " ", str(value or "")).strip()
+    return (value or fallback)[:max_length]
+
+
+def build_uploaded_part(payload: UploadRequest) -> dict[str, Any]:
+    name = clean_upload_text(payload.name, "User submitted CAD model")
+    category = clean_upload_text(payload.category, "Community Uploads")
+    part_id = f"user-{safe_package_name(name)}-{int(time.time())}"
+    cad_format = clean_upload_text(payload.cad_format.upper(), "STEP", 12)
+    mass_grams = max(0.01, round(float(payload.mass_grams), 3))
+    max_rpm = max(0.0, round(float(payload.max_rpm), 2))
+    torque_nm = max(0.0, round(float(payload.torque_nm), 4))
+    source_page = payload.source_page.strip() or payload.cad_url.strip()
+    return {
+        "id": part_id,
+        "name": name,
+        "category": category,
+        "summary": clean_upload_text(
+            payload.summary,
+            "Community-submitted Smart CAD model awaiting engineering review.",
+            320,
+        ),
+        "cad": {
+            "format": cad_format,
+            "filename": f"{safe_package_name(name)}.{cad_format.lower()}",
+            "download_url": payload.cad_url.strip(),
+            "source_page": source_page,
+            "repository": "PhysixCAD Community Uploads",
+            "license": "Submitted by user; verify before commercial use",
+            "source_type": "user_upload",
+        },
+        "physics": {
+            "mass_grams": mass_grams,
+            "material_composition": [
+                {
+                    "material": clean_upload_text(payload.material, "User specified material", 120),
+                    "density_g_cm3": None,
+                    "percentage": 100,
+                }
+            ],
+            "center_of_mass_mm": {"x": 0, "y": 0, "z": 0},
+            "motion": {
+                "max_rotational_velocity_rpm": max_rpm,
+                "holding_torque_nm": torque_nm,
+            },
+            "joint_constraints": [
+                {
+                    "type": clean_upload_text(payload.constraint_type, "fixed_body", 80),
+                    "axis": "user_defined",
+                    "limits_degrees": [0, 0],
+                }
+            ],
+        },
+        "media": {
+            "image_url": "",
+            "image_source": source_page,
+            "alt": f"{name} community CAD preview",
+        },
+        "competition_relevance": payload.competition_relevance[:8],
+        "metadata_quality": {
+            "source": "community_upload",
+            "confidence": "needs_review",
+            "review_status": "pending_admin_review",
+        },
+        "created_at": utc_timestamp(),
+    }
+
+
+def engine_export_payload(part: dict[str, Any], engine: str) -> dict[str, Any]:
+    engine_key = engine.lower().replace("_", "-")
+    if engine_key not in {"unity", "unreal", "matlab", "ros-gazebo"}:
+        raise HTTPException(status_code=404, detail="Unknown export preset.")
+
+    physics = part["physics"]
+    center_mm = physics.get("center_of_mass_mm", {})
+    mass_kg = round(float(physics.get("mass_grams", 0)) / 1000.0, 6)
+    base = {
+        "part_id": part["id"],
+        "part_name": part["name"],
+        "category": part["category"],
+        "cad": part["cad"],
+        "material": primary_material(part),
+        "mass_kg": mass_kg,
+        "center_of_mass_m": {
+            "x": round(float(center_mm.get("x", 0)) / 1000.0, 6),
+            "y": round(float(center_mm.get("y", 0)) / 1000.0, 6),
+            "z": round(float(center_mm.get("z", 0)) / 1000.0, 6),
+        },
+        "joint_constraints": physics.get("joint_constraints", []),
+        "motion": physics.get("motion", {}),
+        "generated_at": utc_timestamp(),
+    }
+    if engine_key == "unity":
+        base["engine"] = "Unity"
+        base["component_mapping"] = {
+            "Rigidbody.mass": mass_kg,
+            "Rigidbody.centerOfMass": base["center_of_mass_m"],
+            "Collider.source": "Use imported CAD mesh collider or simplified convex collider",
+        }
+    elif engine_key == "unreal":
+        base["engine"] = "Unreal Engine"
+        base["component_mapping"] = {
+            "BodyInstance.mass_kg": mass_kg,
+            "CenterOfMassOffset_cm": {
+                axis: round(value * 100.0, 4)
+                for axis, value in base["center_of_mass_m"].items()
+            },
+            "PhysicalMaterial": primary_material(part),
+        }
+    elif engine_key == "matlab":
+        base["engine"] = "MATLAB Simscape Multibody"
+        base["component_mapping"] = {
+            "Solid.Mass": {"value": mass_kg, "unit": "kg"},
+            "Solid.CenterOfMass": {"value": base["center_of_mass_m"], "unit": "m"},
+            "Geometry.Import": part["cad"]["filename"],
+        }
+    else:
+        base["engine"] = "ROS / Gazebo"
+        base["component_mapping"] = {
+            "urdf.inertial.mass": mass_kg,
+            "urdf.inertial.origin.xyz": base["center_of_mass_m"],
+            "gazebo.material": primary_material(part),
+        }
+    return base
+
+
 def build_smart_package(part: dict[str, Any]) -> BytesIO:
     part_slug = safe_package_name(part["id"])
     package = BytesIO()
@@ -511,7 +742,7 @@ def health() -> dict[str, Any]:
 @app.get("/api/parts")
 def api_parts() -> dict[str, Any]:
     data = load_database()
-    parts = data["parts"]
+    parts = list_parts()
     return {
         "count": len(parts),
         "catalog": data.get("catalog", {}),
@@ -600,6 +831,109 @@ def api_presence_heartbeat(payload: PresenceRequest) -> dict[str, Any]:
         active_clients[client_id] = time.monotonic()
         online_count = prune_presence()
     return {"online_count": online_count, "timeout_seconds": PRESENCE_TIMEOUT_SECONDS}
+
+
+@app.get("/api/collections")
+def api_collections() -> dict[str, Any]:
+    return {"count": len(COLLECTIONS), "collections": COLLECTIONS}
+
+
+@app.post("/api/uploads")
+def api_upload_model(payload: UploadRequest) -> dict[str, Any]:
+    submitter_id = clean_client_id(payload.submitter_id)
+    if not payload.cad_url.strip().startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="CAD URL must be an http or https link.")
+
+    part = build_uploaded_part(payload)
+    part["submitter_id"] = submitter_id
+    with upload_lock:
+        store = load_json_store(UPLOADS_PATH, "uploads")
+        store.setdefault("uploads", []).append(part)
+        save_json_store(UPLOADS_PATH, store)
+    return {"ok": True, "part": part}
+
+
+@app.get("/api/uploads")
+def api_uploads() -> dict[str, Any]:
+    uploads = load_uploaded_parts()
+    return {"count": len(uploads), "uploads": uploads}
+
+
+@app.post("/api/parts/{part_id}/report")
+def api_report_part(part_id: str, payload: ReportRequest) -> dict[str, Any]:
+    part = get_part(part_id)
+    reporter_id = clean_client_id(payload.reporter_id)
+    reason = clean_upload_text(payload.reason, "Incorrect model metadata", 120)
+    detail = clean_upload_text(payload.detail, "", 600)
+    report = {
+        "id": f"report-{safe_package_name(part_id)}-{int(time.time())}",
+        "part_id": part_id,
+        "part_name": part["name"],
+        "reporter_id": reporter_id,
+        "reason": reason,
+        "detail": detail,
+        "created_at": utc_timestamp(),
+        "status": "open",
+    }
+    with report_lock:
+        store = load_json_store(REPORTS_PATH, "reports")
+        store.setdefault("reports", []).append(report)
+        save_json_store(REPORTS_PATH, store)
+    return {"ok": True, "report": report}
+
+
+@app.get("/api/parts/{part_id}/export/{engine}")
+def api_engine_export(part_id: str, engine: str) -> StreamingResponse:
+    part = get_part(part_id)
+    payload = engine_export_payload(part, engine)
+    engine_slug = safe_package_name(payload["engine"])
+    filename = f"{safe_package_name(part_id)}-{engine_slug}-physics.json"
+    return StreamingResponse(
+        BytesIO(json.dumps(payload, indent=2).encode("utf-8")),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/admin/stats")
+def api_admin_stats() -> dict[str, Any]:
+    parts = list_parts()
+    with vote_lock:
+        vote_store = load_vote_store()
+    reports = load_json_store(REPORTS_PATH, "reports").get("reports", [])
+    uploads = load_uploaded_parts()
+
+    vote_summaries = {
+        part_id: summarize_vote_record(record)
+        for part_id, record in vote_store.get("parts", {}).items()
+    }
+    top_verified = sorted(
+        (
+            {"part_id": part_id, **summary}
+            for part_id, summary in vote_summaries.items()
+            if summary["total"] > 0
+        ),
+        key=lambda item: (item["score"], item["upvotes"], -item["downvotes"]),
+        reverse=True,
+    )[:10]
+    flagged_by_votes = [
+        {"part_id": part_id, **summary}
+        for part_id, summary in vote_summaries.items()
+        if summary["downvotes"] > summary["upvotes"] and summary["total"] > 0
+    ][:20]
+    open_reports = [report for report in reports if report.get("status") == "open"]
+    return {
+        "models": len(parts),
+        "categories": len({part["category"] for part in parts}),
+        "community_uploads": len(uploads),
+        "total_votes": sum(summary["total"] for summary in vote_summaries.values()),
+        "open_reports": len(open_reports),
+        "flagged_by_votes": flagged_by_votes,
+        "latest_reports": open_reports[-10:],
+        "top_verified": top_verified,
+        "collections": len(COLLECTIONS),
+        "generated_at": utc_timestamp(),
+    }
 
 
 @app.get("/api/source-pipeline")

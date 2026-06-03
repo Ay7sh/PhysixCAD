@@ -6,6 +6,11 @@
   <title>PhysixCAD Smart CAD Marketplace</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+    window.PhysixThree = THREE;
+    window.dispatchEvent(new Event('physix-three-ready'));
+  </script>
   <style>
     :root {
       color-scheme: dark;
@@ -118,6 +123,29 @@
     @keyframes ping {
       75%, 100% { transform: scale(1.9); opacity: 0; }
     }
+    .modal-panel {
+      max-height: min(90vh, 56rem);
+    }
+    .detail-viewer {
+      min-height: 20rem;
+      aspect-ratio: 16 / 10;
+    }
+    .control-input {
+      height: 2.75rem;
+      width: 100%;
+      border-radius: 6px;
+      border: 1px solid rgba(51, 65, 85, 0.95);
+      background: rgba(2, 6, 23, 0.72);
+      padding: 0 0.75rem;
+      color: #e2e8f0;
+      outline: none;
+    }
+    .control-input:focus {
+      border-color: rgba(53, 214, 200, 0.64);
+    }
+    .modal-backdrop[aria-hidden="true"] {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -160,8 +188,81 @@
     </header>
 
     <main class="flex-1">
+      <section class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap gap-2">
+          <button id="upload-open" class="inline-flex h-10 items-center gap-2 rounded-md border border-cyan-300/45 bg-cyan-300/12 px-3 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-300/20" type="button">
+            <i data-lucide="upload-cloud" class="h-4 w-4"></i>
+            Upload Model
+          </button>
+          <button id="admin-open" class="inline-flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-sm font-semibold text-slate-200 transition hover:border-amber-300/50 hover:text-amber-100" type="button">
+            <i data-lucide="layout-dashboard" class="h-4 w-4"></i>
+            Admin Dashboard
+          </button>
+        </div>
+        <div class="text-xs uppercase text-slate-500">Simulation Teams Workspace</div>
+      </section>
+
+      <section class="mb-4">
+        <div id="collection-strip" class="chip-scroll flex gap-2 overflow-x-auto pb-2"></div>
+      </section>
+
       <section class="mb-5">
         <div id="filters" class="chip-scroll flex gap-2 overflow-x-auto pb-2"></div>
+      </section>
+
+      <section class="glass mb-5 rounded-lg p-4">
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <label class="text-xs uppercase text-slate-500">
+            Material
+            <select id="material-filter" class="control-input mt-1 text-sm normal-case">
+              <option value="">All materials</option>
+            </select>
+          </label>
+          <label class="text-xs uppercase text-slate-500">
+            CAD Format
+            <select id="format-filter" class="control-input mt-1 text-sm normal-case">
+              <option value="">All formats</option>
+            </select>
+          </label>
+          <label class="text-xs uppercase text-slate-500">
+            Source
+            <select id="source-filter" class="control-input mt-1 text-sm normal-case">
+              <option value="">All sources</option>
+            </select>
+          </label>
+          <label class="text-xs uppercase text-slate-500">
+            Min Mass
+            <input id="mass-min" class="control-input mt-1 text-sm normal-case" inputmode="decimal" placeholder="0 g">
+          </label>
+          <label class="text-xs uppercase text-slate-500">
+            Max Mass
+            <input id="mass-max" class="control-input mt-1 text-sm normal-case" inputmode="decimal" placeholder="Any">
+          </label>
+          <label class="text-xs uppercase text-slate-500">
+            Sort
+            <select id="sort-filter" class="control-input mt-1 text-sm normal-case">
+              <option value="trust-desc">Highest trust</option>
+              <option value="votes-desc">Most votes</option>
+              <option value="mass-asc">Lightest</option>
+              <option value="mass-desc">Heaviest</option>
+              <option value="name-asc">Name A-Z</option>
+            </select>
+          </label>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-3 text-sm">
+          <label class="inline-flex items-center gap-2 text-slate-300">
+            <input id="verified-only" type="checkbox" class="h-4 w-4 accent-lime-300">
+            Community verified only
+          </label>
+          <label class="inline-flex items-center gap-2 text-slate-300">
+            <input id="needs-review-only" type="checkbox" class="h-4 w-4 accent-rose-300">
+            Needs review only
+          </label>
+          <button id="reset-filters" class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-xs font-semibold text-slate-200 transition hover:border-cyan-300/50 hover:text-cyan-100" type="button">
+            <i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>
+            Reset Filters
+          </button>
+        </div>
       </section>
 
       <section class="mb-3 flex items-center justify-between gap-3 text-sm text-slate-400">
@@ -235,7 +336,10 @@
             <h2 class="part-name text-lg font-semibold leading-tight text-white"></h2>
             <p class="part-summary mt-1 line-clamp-2 text-sm leading-5 text-slate-400"></p>
           </div>
-          <span class="category-tag shrink-0 rounded border px-2 py-1 text-[11px] font-medium uppercase"></span>
+          <div class="flex shrink-0 flex-col items-end gap-1">
+            <span class="category-tag rounded border px-2 py-1 text-[11px] font-medium uppercase"></span>
+            <span class="verification-badge rounded border border-slate-700 bg-slate-950/70 px-2 py-1 text-[10px] font-semibold uppercase text-slate-300"></span>
+          </div>
         </div>
         <div class="specs mb-4 rounded-md border border-slate-700/70 bg-black/20 px-3 py-2 text-sm"></div>
         <div class="vote-panel mb-4 rounded-md border border-slate-700/70 bg-slate-950/50 p-3">
@@ -248,6 +352,10 @@
             <div class="rounded-md border border-slate-700 bg-black/30 px-2 py-1 text-right">
               <span class="block text-[10px] uppercase text-slate-500">Score</span>
               <strong class="vote-score text-base text-white">0</strong>
+            </div>
+            <div class="rounded-md border border-slate-700 bg-black/30 px-2 py-1 text-right">
+              <span class="block text-[10px] uppercase text-slate-500">Trust</span>
+              <strong class="trust-score text-base text-white">50</strong>
             </div>
           </div>
           <div class="mt-3 grid grid-cols-2 gap-2">
@@ -265,13 +373,140 @@
           <p class="vote-confidence mt-2 text-xs text-slate-500">No votes yet</p>
         </div>
         <div class="competition-tags mb-4 flex flex-wrap gap-1.5"></div>
-        <button class="download-btn mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-md border border-cyan-300/50 bg-cyan-300/12 px-4 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-300/20">
-          <i data-lucide="download" class="h-4 w-4"></i>
-          Download Smart CAD Package
-        </button>
+        <div class="mt-auto grid gap-2 sm:grid-cols-2">
+          <button class="details-btn inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-4 text-sm font-semibold text-slate-100 transition hover:border-cyan-300/50 hover:text-cyan-100" type="button">
+            <i data-lucide="scan-search" class="h-4 w-4"></i>
+            View Details
+          </button>
+          <button class="download-btn inline-flex h-11 items-center justify-center gap-2 rounded-md border border-cyan-300/50 bg-cyan-300/12 px-4 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-300/20" type="button">
+            <i data-lucide="download" class="h-4 w-4"></i>
+            Smart Package
+          </button>
+        </div>
       </div>
     </article>
   </template>
+
+  <div id="detail-modal" class="modal-backdrop fixed inset-0 z-50 bg-black/70 px-4 py-6 backdrop-blur-sm" aria-hidden="true">
+    <div class="modal-panel mx-auto flex w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 shadow-2xl">
+      <div class="flex items-start justify-between gap-4 border-b border-slate-700 px-5 py-4">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span id="detail-category" class="rounded border border-cyan-300/40 bg-cyan-300/10 px-2 py-1 text-xs font-semibold uppercase text-cyan-100"></span>
+            <span id="detail-verification" class="rounded border border-slate-700 bg-black/30 px-2 py-1 text-xs font-semibold uppercase text-slate-300"></span>
+            <span id="detail-trust" class="rounded border border-lime-300/35 bg-lime-300/10 px-2 py-1 text-xs font-semibold uppercase text-lime-100"></span>
+          </div>
+          <h2 id="detail-name" class="mt-3 text-2xl font-semibold text-white"></h2>
+          <p id="detail-summary" class="mt-1 max-w-3xl text-sm leading-6 text-slate-400"></p>
+        </div>
+        <button id="detail-close" class="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-slate-700 bg-slate-950/70 text-slate-300 hover:border-cyan-300/50 hover:text-cyan-100" type="button" title="Close">
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </div>
+      <div class="overflow-y-auto p-5">
+        <div class="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+          <div>
+            <div id="detail-viewer" class="detail-viewer preview-shell"></div>
+            <div class="mt-3 grid gap-2 sm:grid-cols-4">
+              <a id="export-unity" class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-xs font-semibold text-slate-200 hover:border-cyan-300/50 hover:text-cyan-100">
+                <i data-lucide="box" class="h-3.5 w-3.5"></i>
+                Unity
+              </a>
+              <a id="export-unreal" class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-xs font-semibold text-slate-200 hover:border-cyan-300/50 hover:text-cyan-100">
+                <i data-lucide="layers-3" class="h-3.5 w-3.5"></i>
+                Unreal
+              </a>
+              <a id="export-matlab" class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-xs font-semibold text-slate-200 hover:border-cyan-300/50 hover:text-cyan-100">
+                <i data-lucide="function-square" class="h-3.5 w-3.5"></i>
+                MATLAB
+              </a>
+              <a id="export-ros" class="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-xs font-semibold text-slate-200 hover:border-cyan-300/50 hover:text-cyan-100">
+                <i data-lucide="network" class="h-3.5 w-3.5"></i>
+                ROS/Gazebo
+              </a>
+            </div>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+              <a id="detail-package" class="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-cyan-300/50 bg-cyan-300/12 px-4 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-300/20">
+                <i data-lucide="download" class="h-4 w-4"></i>
+                Download Smart CAD Package
+              </a>
+              <a id="detail-source" class="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-4 text-sm font-semibold text-slate-100 transition hover:border-cyan-300/50 hover:text-cyan-100" target="_blank" rel="noreferrer">
+                <i data-lucide="external-link" class="h-4 w-4"></i>
+                Open CAD Source
+              </a>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <div id="detail-specs" class="rounded-md border border-slate-700/70 bg-black/20 px-3 py-2 text-sm"></div>
+            <div class="rounded-md border border-slate-700/70 bg-black/20 p-3">
+              <p class="text-xs font-semibold uppercase text-slate-500">Report Model</p>
+              <select id="report-reason" class="control-input mt-2 text-sm">
+                <option>Broken CAD download</option>
+                <option>Incorrect physics metadata</option>
+                <option>Wrong part identity</option>
+                <option>Unsafe engineering values</option>
+              </select>
+              <textarea id="report-detail" class="mt-2 min-h-24 w-full rounded-md border border-slate-700 bg-slate-950/70 p-3 text-sm text-slate-100 outline-none focus:border-cyan-300/60" placeholder="Optional report notes"></textarea>
+              <button id="report-submit" class="mt-2 inline-flex h-10 items-center gap-2 rounded-md border border-rose-300/40 bg-rose-300/10 px-3 text-sm font-semibold text-rose-100 hover:bg-rose-300/20" type="button">
+                <i data-lucide="flag" class="h-4 w-4"></i>
+                Submit Report
+              </button>
+              <p id="report-status" class="mt-2 text-xs text-slate-500"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="upload-modal" class="modal-backdrop fixed inset-0 z-50 bg-black/70 px-4 py-6 backdrop-blur-sm" aria-hidden="true">
+    <form id="upload-form" class="modal-panel mx-auto flex w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+        <div>
+          <p class="text-xs font-semibold uppercase text-cyan-200">Community Upload</p>
+          <h2 class="mt-1 text-xl font-semibold text-white">Submit Smart CAD Model</h2>
+        </div>
+        <button class="modal-close grid h-9 w-9 place-items-center rounded-md border border-slate-700 bg-slate-950/70 text-slate-300 hover:border-cyan-300/50 hover:text-cyan-100" type="button" title="Close">
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </div>
+      <div class="grid gap-3 overflow-y-auto p-5 sm:grid-cols-2">
+        <label class="text-xs uppercase text-slate-500">Name<input name="name" class="control-input mt-1 text-sm normal-case" required></label>
+        <label class="text-xs uppercase text-slate-500">Category<input name="category" class="control-input mt-1 text-sm normal-case" required></label>
+        <label class="text-xs uppercase text-slate-500 sm:col-span-2">CAD Download URL<input name="cad_url" class="control-input mt-1 text-sm normal-case" required placeholder="https://..."></label>
+        <label class="text-xs uppercase text-slate-500 sm:col-span-2">Source Page<input name="source_page" class="control-input mt-1 text-sm normal-case" placeholder="https://..."></label>
+        <label class="text-xs uppercase text-slate-500">CAD Format<input name="cad_format" class="control-input mt-1 text-sm normal-case" value="STEP"></label>
+        <label class="text-xs uppercase text-slate-500">Material<input name="material" class="control-input mt-1 text-sm normal-case" value="User specified material"></label>
+        <label class="text-xs uppercase text-slate-500">Mass (g)<input name="mass_grams" class="control-input mt-1 text-sm normal-case" inputmode="decimal" value="100"></label>
+        <label class="text-xs uppercase text-slate-500">Max RPM<input name="max_rpm" class="control-input mt-1 text-sm normal-case" inputmode="decimal" value="0"></label>
+        <label class="text-xs uppercase text-slate-500">Torque (N*m)<input name="torque_nm" class="control-input mt-1 text-sm normal-case" inputmode="decimal" value="0"></label>
+        <label class="text-xs uppercase text-slate-500">Constraint<input name="constraint_type" class="control-input mt-1 text-sm normal-case" value="fixed_body"></label>
+        <label class="text-xs uppercase text-slate-500 sm:col-span-2">Summary<textarea name="summary" class="mt-1 min-h-24 w-full rounded-md border border-slate-700 bg-slate-950/70 p-3 text-sm text-slate-100 outline-none focus:border-cyan-300/60"></textarea></label>
+      </div>
+      <div class="flex items-center justify-between gap-3 border-t border-slate-700 px-5 py-4">
+        <p id="upload-status" class="text-sm text-slate-400"></p>
+        <button class="inline-flex h-10 items-center gap-2 rounded-md border border-cyan-300/50 bg-cyan-300/12 px-4 text-sm font-semibold text-cyan-50 transition hover:bg-cyan-300/20" type="submit">
+          <i data-lucide="send" class="h-4 w-4"></i>
+          Submit Model
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div id="admin-modal" class="modal-backdrop fixed inset-0 z-50 bg-black/70 px-4 py-6 backdrop-blur-sm" aria-hidden="true">
+    <div class="modal-panel mx-auto flex w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+        <div>
+          <p class="text-xs font-semibold uppercase text-amber-200">Admin</p>
+          <h2 class="mt-1 text-xl font-semibold text-white">Marketplace Dashboard</h2>
+        </div>
+        <button class="modal-close grid h-9 w-9 place-items-center rounded-md border border-slate-700 bg-slate-950/70 text-slate-300 hover:border-cyan-300/50 hover:text-cyan-100" type="button" title="Close">
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </div>
+      <div id="admin-content" class="overflow-y-auto p-5 text-sm text-slate-300"></div>
+    </div>
+  </div>
 
   <script>
     function getClientId() {
@@ -294,6 +529,19 @@
       visible: 72,
       votes: {},
       userVotes: {},
+      collections: [],
+      activeCollection: '',
+      selectedPart: null,
+      filters: {
+        material: '',
+        format: '',
+        source: '',
+        minMass: '',
+        maxMass: '',
+        verifiedOnly: false,
+        needsReviewOnly: false,
+        sort: 'trust-desc'
+      },
       clientId: getClientId()
     };
     const PAGE_SIZE = 72;
@@ -304,7 +552,23 @@
     const resultCount = document.querySelector('#result-count');
     const loadMore = document.querySelector('#load-more');
     const onlineCount = document.querySelector('#online-count');
+    const collectionStrip = document.querySelector('#collection-strip');
+    const materialFilter = document.querySelector('#material-filter');
+    const formatFilter = document.querySelector('#format-filter');
+    const sourceFilter = document.querySelector('#source-filter');
+    const massMin = document.querySelector('#mass-min');
+    const massMax = document.querySelector('#mass-max');
+    const sortFilter = document.querySelector('#sort-filter');
+    const verifiedOnly = document.querySelector('#verified-only');
+    const needsReviewOnly = document.querySelector('#needs-review-only');
+    const detailModal = document.querySelector('#detail-modal');
+    const uploadModal = document.querySelector('#upload-modal');
+    const adminModal = document.querySelector('#admin-modal');
+    const uploadForm = document.querySelector('#upload-form');
+    const uploadStatus = document.querySelector('#upload-status');
+    const adminContent = document.querySelector('#admin-content');
     const canvases = new Map();
+    let detailAnimationId = null;
 
     const palette = [
       ['#35d6c8', 'rgba(53, 214, 200, 0.09)'],
@@ -371,6 +635,82 @@
       return state.votes[partId] || defaultVoteSummary();
     }
 
+    function sourceType(part) {
+      return part.cad?.source_type || (part.cad?.repository?.includes('PhysixCAD') ? 'procedural' : 'public_source');
+    }
+
+    function sourceLabel(part) {
+      const type = sourceType(part);
+      if (type === 'procedural') return 'PhysixCAD Procedural';
+      if (type === 'user_upload') return 'Community Upload';
+      return part.cad?.repository || 'Public CAD Source';
+    }
+
+    function verificationState(partId) {
+      const summary = voteSummary(partId);
+      if (summary.total >= 3 && summary.genuine_percent >= 75) return { label: 'Community Verified', tone: 'verified' };
+      if (summary.total > 0 && summary.downvotes > summary.upvotes) return { label: 'Needs Review', tone: 'review' };
+      if (summary.total > 0) return { label: 'Community Checked', tone: 'checked' };
+      return { label: 'Unverified', tone: 'neutral' };
+    }
+
+    function trustScore(part) {
+      const summary = voteSummary(part.id);
+      const type = sourceType(part);
+      let score = 50;
+      score += Math.min(28, summary.upvotes * 4);
+      score -= Math.min(36, summary.downvotes * 8);
+      if (type === 'public_source') score += 14;
+      if (type === 'procedural') score += 8;
+      if (type === 'user_upload') score -= 8;
+      if (part.media?.image_url) score += 4;
+      if (part.metadata_quality?.confidence === 'needs_review') score -= 8;
+      return Math.max(0, Math.min(100, Math.round(score)));
+    }
+
+    function applyVerificationBadge(element, part) {
+      const stateInfo = verificationState(part.id);
+      element.textContent = stateInfo.label;
+      if (stateInfo.tone === 'verified') {
+        element.style.borderColor = 'rgba(184, 243, 109, 0.6)';
+        element.style.background = 'rgba(184, 243, 109, 0.12)';
+        element.style.color = '#ecfccb';
+      } else if (stateInfo.tone === 'review') {
+        element.style.borderColor = 'rgba(253, 164, 175, 0.65)';
+        element.style.background = 'rgba(253, 164, 175, 0.12)';
+        element.style.color = '#ffe4e6';
+      } else if (stateInfo.tone === 'checked') {
+        element.style.borderColor = 'rgba(125, 211, 252, 0.55)';
+        element.style.background = 'rgba(125, 211, 252, 0.1)';
+        element.style.color = '#e0f2fe';
+      } else {
+        element.style.borderColor = 'rgba(51, 65, 85, 1)';
+        element.style.background = 'rgba(2, 6, 23, 0.72)';
+        element.style.color = '#cbd5e1';
+      }
+    }
+
+    function matchesCollection(part, collectionId) {
+      if (!collectionId) return true;
+      const collection = state.collections.find((item) => item.id === collectionId);
+      if (!collection) return true;
+      const relevance = (part.competition_relevance || []).join(' ').toLowerCase();
+      const name = `${part.name} ${part.summary}`.toLowerCase();
+      return (collection.categories || []).includes(part.category)
+        || (collection.keywords || []).some((keyword) => relevance.includes(keyword.toLowerCase()) || name.includes(keyword.toLowerCase()));
+    }
+
+    function partMaterialSearch(part) {
+      return (part.physics?.material_composition || [])
+        .map((item) => item.material || '')
+        .join(' ')
+        .toLowerCase();
+    }
+
+    function massGrams(part) {
+      return Number(part.physics?.mass_grams || 0);
+    }
+
     function formatScore(score) {
       return score > 0 ? `+${score}` : String(score);
     }
@@ -398,6 +738,8 @@
       panel.querySelector('.vote-status').textContent = summary.label;
       panel.querySelector('.vote-total').textContent = `${summary.total.toLocaleString()} community ${summary.total === 1 ? 'vote' : 'votes'}`;
       panel.querySelector('.vote-score').textContent = formatScore(summary.score);
+      const part = state.parts.find((item) => item.id === partId);
+      if (part) panel.querySelector('.trust-score').textContent = trustScore(part);
       panel.querySelector('.up-count').textContent = summary.upvotes.toLocaleString();
       panel.querySelector('.down-count').textContent = summary.downvotes.toLocaleString();
       panel.querySelector('.vote-confidence').textContent = summary.total
@@ -422,7 +764,7 @@
         const data = await response.json();
         state.votes[partId] = data.votes;
         state.userVotes[partId] = data.user_vote;
-        updateVoteElements(panel, partId);
+        refreshVoteDisplays(partId);
       } catch {
         panel.querySelector('.vote-status').textContent = 'Vote unavailable';
         panel.querySelector('.vote-confidence').textContent = 'Try again after the API is reachable.';
@@ -432,11 +774,22 @@
     }
 
     function bindVotePanel(panel, partId) {
+      panel.dataset.votePanel = partId;
       panel.dataset.partId = partId;
       panel.querySelectorAll('.vote-btn').forEach((button) => {
         button.addEventListener('click', () => submitVote(partId, button.dataset.vote, panel));
       });
       updateVoteElements(panel, partId);
+    }
+
+    function refreshVoteDisplays(partId) {
+      document.querySelectorAll(`[data-vote-panel="${CSS.escape(partId)}"]`).forEach((panel) => updateVoteElements(panel, partId));
+      const part = state.parts.find((item) => item.id === partId);
+      if (part) {
+        document.querySelectorAll(`[data-verification-part="${CSS.escape(partId)}"]`).forEach((badge) => applyVerificationBadge(badge, part));
+        document.querySelectorAll(`[data-trust-part="${CSS.escape(partId)}"]`).forEach((node) => { node.textContent = trustScore(part); });
+      }
+      if (state.selectedPart?.id === partId) populateDetail(state.selectedPart);
     }
 
     function renderFilters() {
@@ -461,13 +814,73 @@
       });
     }
 
+    function renderCollections() {
+      collectionStrip.innerHTML = '';
+      [{ id: '', name: 'All Collections', icon: 'boxes' }, ...state.collections].forEach((collection) => {
+        const button = document.createElement('button');
+        const active = state.activeCollection === collection.id;
+        button.className = 'shrink-0 inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition';
+        button.style.borderColor = active ? 'rgba(53, 214, 200, 0.68)' : 'rgba(51, 65, 85, 0.95)';
+        button.style.background = active ? 'rgba(53, 214, 200, 0.11)' : 'rgba(2, 6, 23, 0.72)';
+        button.style.color = active ? '#cffafe' : '#cbd5e1';
+        button.innerHTML = `<i data-lucide="${collection.icon || 'boxes'}" class="h-4 w-4"></i><span>${collection.name}</span>`;
+        button.addEventListener('click', () => {
+          state.activeCollection = collection.id;
+          state.visible = PAGE_SIZE;
+          renderCollections();
+          render();
+        });
+        collectionStrip.appendChild(button);
+      });
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    function fillSelect(select, values, firstLabel) {
+      const current = select.value;
+      select.innerHTML = `<option value="">${firstLabel}</option>`;
+      values.forEach((value) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+      });
+      select.value = values.includes(current) ? current : '';
+    }
+
+    function renderAdvancedFilterOptions() {
+      const materials = [...new Set(state.parts.flatMap((part) => (part.physics?.material_composition || []).map((item) => item.material).filter(Boolean)))].sort();
+      const formats = [...new Set(state.parts.map((part) => part.cad?.format).filter(Boolean))].sort();
+      const sources = [...new Set(state.parts.map(sourceLabel).filter(Boolean))].sort();
+      fillSelect(materialFilter, materials, 'All materials');
+      fillSelect(formatFilter, formats, 'All formats');
+      fillSelect(sourceFilter, sources, 'All sources');
+    }
+
     function filteredParts() {
       const query = state.query.trim().toLowerCase();
-      return state.parts.filter((part) => {
+      const minMass = Number.parseFloat(state.filters.minMass);
+      const maxMass = Number.parseFloat(state.filters.maxMass);
+      const filtered = state.parts.filter((part) => {
         const matchesCategory = state.filter === 'All' || part.category === state.filter;
         if (!matchesCategory) return false;
+        if (!matchesCollection(part, state.activeCollection)) return false;
+        if (state.filters.material && !partMaterialSearch(part).includes(state.filters.material.toLowerCase())) return false;
+        if (state.filters.format && part.cad?.format !== state.filters.format) return false;
+        if (state.filters.source && sourceLabel(part) !== state.filters.source) return false;
+        if (!Number.isNaN(minMass) && massGrams(part) < minMass) return false;
+        if (!Number.isNaN(maxMass) && massGrams(part) > maxMass) return false;
+        const verification = verificationState(part.id);
+        if (state.filters.verifiedOnly && verification.label !== 'Community Verified') return false;
+        if (state.filters.needsReviewOnly && verification.label !== 'Needs Review') return false;
         if (!query) return true;
         return JSON.stringify(part).toLowerCase().includes(query);
+      });
+      return filtered.sort((a, b) => {
+        if (state.filters.sort === 'votes-desc') return voteSummary(b.id).total - voteSummary(a.id).total;
+        if (state.filters.sort === 'mass-asc') return massGrams(a) - massGrams(b);
+        if (state.filters.sort === 'mass-desc') return massGrams(b) - massGrams(a);
+        if (state.filters.sort === 'name-asc') return a.name.localeCompare(b.name);
+        return trustScore(b) - trustScore(a);
       });
     }
 
@@ -483,6 +896,7 @@
         const node = template.content.cloneNode(true);
         const canvas = node.querySelector('canvas');
         const tag = node.querySelector('.category-tag');
+        const verificationBadge = node.querySelector('.verification-badge');
         const [stroke, fill] = colorFor(part.category);
 
         node.querySelector('.part-name').textContent = part.name;
@@ -491,6 +905,8 @@
         tag.style.color = stroke;
         tag.style.borderColor = `${stroke}88`;
         tag.style.background = fill;
+        verificationBadge.dataset.verificationPart = part.id;
+        applyVerificationBadge(verificationBadge, part);
 
         const image = node.querySelector('.part-image');
         image.alt = part.media?.alt || `${part.name} image`;
@@ -504,7 +920,7 @@
 
         node.querySelector('.image-link').href = part.media?.image_source || part.media?.image_url || part.cad.source_page;
         node.querySelector('.source-link').href = part.cad.source_page;
-        node.querySelector('.format-pill').textContent = `${part.cad.format} | ${part.cad.repository}`;
+        node.querySelector('.format-pill').textContent = `${part.cad.format} | ${sourceLabel(part)}`;
         node.querySelector('.specs').innerHTML = [
           specRow('Mass', `${part.physics.mass_grams} g`),
           specRow('Materials', materialLabel(part.physics.material_composition)),
@@ -524,6 +940,10 @@
 
         node.querySelector('.download-btn').addEventListener('click', () => {
           window.location.href = `/api/parts/${part.id}/smart-package`;
+        });
+        node.querySelector('.details-btn').addEventListener('click', () => {
+          window.location.hash = `part=${encodeURIComponent(part.id)}`;
+          openDetail(part.id);
         });
 
         catalog.appendChild(node);
@@ -668,6 +1088,243 @@
       }
     }
 
+    function openModal(modal) {
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    function closeModal(modal) {
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      if (modal === detailModal) {
+        state.selectedPart = null;
+        if (detailAnimationId) cancelAnimationFrame(detailAnimationId);
+        detailAnimationId = null;
+        if (window.location.hash.startsWith('#part=')) history.replaceState(null, '', window.location.pathname);
+      }
+    }
+
+    function openDetail(partId) {
+      const part = state.parts.find((item) => item.id === partId);
+      if (!part) return;
+      state.selectedPart = part;
+      populateDetail(part);
+      openModal(detailModal);
+    }
+
+    function populateDetail(part) {
+      const summary = voteSummary(part.id);
+      const verification = verificationState(part.id);
+      document.querySelector('#detail-name').textContent = part.name;
+      document.querySelector('#detail-summary').textContent = part.summary;
+      document.querySelector('#detail-category').textContent = part.category;
+      document.querySelector('#detail-verification').textContent = verification.label;
+      document.querySelector('#detail-trust').textContent = `Trust ${trustScore(part)}/100`;
+      document.querySelector('#detail-specs').innerHTML = [
+        specRow('Mass', `${part.physics.mass_grams} g`),
+        specRow('Materials', materialLabel(part.physics.material_composition)),
+        specRow('Center Of Mass', vector(part.physics.center_of_mass_mm)),
+        specRow('Motion', motionLabel(part.physics.motion)),
+        specRow('Constraint', constraintLabel(part.physics.joint_constraints?.[0])),
+        specRow('Source', sourceLabel(part)),
+        specRow('Votes', `${summary.upvotes} genuine, ${summary.downvotes} not genuine`)
+      ].join('');
+      document.querySelector('#detail-package').href = `/api/parts/${encodeURIComponent(part.id)}/smart-package`;
+      document.querySelector('#detail-source').href = part.cad.source_page;
+      document.querySelector('#export-unity').href = `/api/parts/${encodeURIComponent(part.id)}/export/unity`;
+      document.querySelector('#export-unreal').href = `/api/parts/${encodeURIComponent(part.id)}/export/unreal`;
+      document.querySelector('#export-matlab').href = `/api/parts/${encodeURIComponent(part.id)}/export/matlab`;
+      document.querySelector('#export-ros').href = `/api/parts/${encodeURIComponent(part.id)}/export/ros-gazebo`;
+      document.querySelector('#report-status').textContent = '';
+      renderDetailViewer(part);
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    function geometryForPart(THREE, part) {
+      const category = part.category.toLowerCase();
+      if (category.includes('bearing')) return new THREE.TorusGeometry(1.05, 0.24, 18, 72);
+      if (category.includes('structural')) return new THREE.BoxGeometry(2.4, 0.46, 0.46, 1, 1, 1);
+      if (category.includes('transmission')) return new THREE.CylinderGeometry(1.0, 1.0, 0.38, 48);
+      if (category.includes('electronics') || category.includes('sensor')) return new THREE.BoxGeometry(2.2, 1.35, 0.16);
+      if (category.includes('pneumatic')) return new THREE.CylinderGeometry(0.46, 0.46, 2.5, 48);
+      return new THREE.CylinderGeometry(0.85, 0.85, 1.25, 56);
+    }
+
+    function renderDetailViewer(part) {
+      const container = document.querySelector('#detail-viewer');
+      if (detailAnimationId) cancelAnimationFrame(detailAnimationId);
+      detailAnimationId = null;
+      container.innerHTML = '';
+      const THREE = window.PhysixThree;
+      if (!THREE) {
+        const canvas = document.createElement('canvas');
+        canvas.className = 'preview-canvas';
+        container.appendChild(canvas);
+        resizeCanvas(canvas);
+        drawWireframe(canvas, part);
+        return;
+      }
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(42, container.clientWidth / container.clientHeight, 0.1, 100);
+      camera.position.set(2.6, 2.1, 3.2);
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+
+      const [stroke] = colorFor(part.category);
+      const group = new THREE.Group();
+      const geometry = geometryForPart(THREE, part);
+      const material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(stroke),
+        metalness: 0.45,
+        roughness: 0.34,
+        transparent: true,
+        opacity: 0.58,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      const edges = new THREE.LineSegments(
+        new THREE.EdgesGeometry(geometry),
+        new THREE.LineBasicMaterial({ color: new THREE.Color('#e2e8f0'), transparent: true, opacity: 0.72 })
+      );
+      group.add(mesh, edges);
+      group.rotation.set(-0.35, 0.55, 0.05);
+      scene.add(group);
+      scene.add(new THREE.HemisphereLight(0x7dd3fc, 0x0f172a, 2.2));
+      const point = new THREE.PointLight(0xffffff, 2.4, 18);
+      point.position.set(3, 4, 5);
+      scene.add(point);
+
+      let dragging = false;
+      let lastX = 0;
+      let lastY = 0;
+      renderer.domElement.addEventListener('pointerdown', (event) => {
+        dragging = true;
+        lastX = event.clientX;
+        lastY = event.clientY;
+        renderer.domElement.setPointerCapture(event.pointerId);
+      });
+      renderer.domElement.addEventListener('pointermove', (event) => {
+        if (!dragging) return;
+        group.rotation.y += (event.clientX - lastX) * 0.01;
+        group.rotation.x += (event.clientY - lastY) * 0.01;
+        lastX = event.clientX;
+        lastY = event.clientY;
+      });
+      renderer.domElement.addEventListener('pointerup', () => { dragging = false; });
+
+      const animate = () => {
+        if (!dragging) group.rotation.y += 0.004;
+        renderer.render(scene, camera);
+        detailAnimationId = requestAnimationFrame(animate);
+      };
+      animate();
+    }
+
+    async function submitReport() {
+      if (!state.selectedPart) return;
+      const status = document.querySelector('#report-status');
+      status.textContent = 'Submitting...';
+      try {
+        const response = await fetch(`/api/parts/${encodeURIComponent(state.selectedPart.id)}/report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            reporter_id: state.clientId,
+            reason: document.querySelector('#report-reason').value,
+            detail: document.querySelector('#report-detail').value
+          })
+        });
+        if (!response.ok) throw new Error('Report failed');
+        status.textContent = 'Report submitted for review.';
+        document.querySelector('#report-detail').value = '';
+      } catch {
+        status.textContent = 'Report API unavailable.';
+      }
+    }
+
+    function renderAdminStats(stats) {
+      const verifiedRows = (stats.top_verified || []).map((item) => `
+        <tr class="border-b border-slate-800">
+          <td class="py-2 text-slate-200">${item.part_id}</td>
+          <td class="py-2">${item.score}</td>
+          <td class="py-2">${item.total}</td>
+        </tr>`).join('') || '<tr><td class="py-2 text-slate-500" colspan="3">No votes yet</td></tr>';
+      const reportRows = (stats.latest_reports || []).map((item) => `
+        <tr class="border-b border-slate-800">
+          <td class="py-2 text-slate-200">${item.part_name}</td>
+          <td class="py-2">${item.reason}</td>
+          <td class="py-2">${item.status}</td>
+        </tr>`).join('') || '<tr><td class="py-2 text-slate-500" colspan="3">No open reports</td></tr>';
+      adminContent.innerHTML = `
+        <div class="grid gap-3 sm:grid-cols-5">
+          ${[
+            ['Models', stats.models],
+            ['Categories', stats.categories],
+            ['Uploads', stats.community_uploads],
+            ['Votes', stats.total_votes],
+            ['Reports', stats.open_reports]
+          ].map(([label, value]) => `<div class="rounded-md border border-slate-700 bg-black/20 p-3"><span class="block text-xs uppercase text-slate-500">${label}</span><strong class="text-xl text-white">${Number(value).toLocaleString()}</strong></div>`).join('')}
+        </div>
+        <div class="mt-5 grid gap-5 lg:grid-cols-2">
+          <div>
+            <h3 class="mb-2 text-sm font-semibold uppercase text-slate-400">Top Verified</h3>
+            <table class="w-full text-left text-xs"><thead class="text-slate-500"><tr><th class="pb-2">Part</th><th class="pb-2">Score</th><th class="pb-2">Votes</th></tr></thead><tbody>${verifiedRows}</tbody></table>
+          </div>
+          <div>
+            <h3 class="mb-2 text-sm font-semibold uppercase text-slate-400">Open Reports</h3>
+            <table class="w-full text-left text-xs"><thead class="text-slate-500"><tr><th class="pb-2">Part</th><th class="pb-2">Reason</th><th class="pb-2">Status</th></tr></thead><tbody>${reportRows}</tbody></table>
+          </div>
+        </div>`;
+    }
+
+    async function openAdmin() {
+      adminContent.innerHTML = '<div class="rounded-md border border-slate-700 bg-black/20 p-4 text-slate-400">Loading dashboard...</div>';
+      openModal(adminModal);
+      try {
+        const response = await fetch('/api/admin/stats');
+        if (!response.ok) throw new Error('Admin stats unavailable');
+        renderAdminStats(await response.json());
+      } catch {
+        adminContent.innerHTML = '<div class="rounded-md border border-amber-300/40 bg-amber-300/10 p-4 text-amber-100">Admin API unavailable.</div>';
+      }
+    }
+
+    async function submitUpload(event) {
+      event.preventDefault();
+      uploadStatus.textContent = 'Submitting...';
+      const form = new FormData(uploadForm);
+      const payload = Object.fromEntries(form.entries());
+      payload.submitter_id = state.clientId;
+      payload.mass_grams = Number(payload.mass_grams || 0);
+      payload.max_rpm = Number(payload.max_rpm || 0);
+      payload.torque_nm = Number(payload.torque_nm || 0);
+      payload.competition_relevance = ['Community Upload'];
+      try {
+        const response = await fetch('/api/uploads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Upload failed');
+        const data = await response.json();
+        state.parts = [data.part, ...state.parts];
+        state.categories = [...new Set(state.parts.map((part) => part.category))].sort();
+        uploadStatus.textContent = 'Model added to the marketplace.';
+        uploadForm.reset();
+        document.querySelector('#stat-models').textContent = state.parts.length.toLocaleString();
+        document.querySelector('#stat-categories').textContent = state.categories.length.toLocaleString();
+        document.querySelector('#stat-images').textContent = state.parts.filter((part) => part.media?.image_url).length.toLocaleString();
+        renderAdvancedFilterOptions();
+        renderFilters();
+        render();
+      } catch {
+        uploadStatus.textContent = 'Upload API unavailable or CAD URL is invalid.';
+      }
+    }
+
     async function sendPresenceHeartbeat() {
       try {
         const response = await fetch('/api/presence/heartbeat', {
@@ -689,27 +1346,116 @@
       state.visible = PAGE_SIZE;
       render();
     });
+    [
+      [materialFilter, 'material'],
+      [formatFilter, 'format'],
+      [sourceFilter, 'source'],
+      [massMin, 'minMass'],
+      [massMax, 'maxMass'],
+      [sortFilter, 'sort']
+    ].forEach(([element, key]) => {
+      element.addEventListener('input', (event) => {
+        state.filters[key] = event.target.value;
+        state.visible = PAGE_SIZE;
+        render();
+      });
+    });
+    verifiedOnly.addEventListener('change', (event) => {
+      state.filters.verifiedOnly = event.target.checked;
+      if (event.target.checked) {
+        state.filters.needsReviewOnly = false;
+        needsReviewOnly.checked = false;
+      }
+      state.visible = PAGE_SIZE;
+      render();
+    });
+    needsReviewOnly.addEventListener('change', (event) => {
+      state.filters.needsReviewOnly = event.target.checked;
+      if (event.target.checked) {
+        state.filters.verifiedOnly = false;
+        verifiedOnly.checked = false;
+      }
+      state.visible = PAGE_SIZE;
+      render();
+    });
+    document.querySelector('#reset-filters').addEventListener('click', () => {
+      state.filter = 'All';
+      state.activeCollection = '';
+      state.query = '';
+      state.visible = PAGE_SIZE;
+      state.filters = { material: '', format: '', source: '', minMass: '', maxMass: '', verifiedOnly: false, needsReviewOnly: false, sort: 'trust-desc' };
+      search.value = '';
+      materialFilter.value = '';
+      formatFilter.value = '';
+      sourceFilter.value = '';
+      massMin.value = '';
+      massMax.value = '';
+      sortFilter.value = 'trust-desc';
+      verifiedOnly.checked = false;
+      needsReviewOnly.checked = false;
+      renderCollections();
+      renderFilters();
+      render();
+    });
     loadMore.addEventListener('click', () => {
       state.visible += PAGE_SIZE;
       render();
+    });
+    document.querySelector('#upload-open').addEventListener('click', () => {
+      uploadStatus.textContent = '';
+      openModal(uploadModal);
+    });
+    document.querySelector('#admin-open').addEventListener('click', openAdmin);
+    document.querySelector('#detail-close').addEventListener('click', () => closeModal(detailModal));
+    document.querySelectorAll('.modal-close').forEach((button) => {
+      button.addEventListener('click', () => closeModal(button.closest('.modal-backdrop')));
+    });
+    [detailModal, uploadModal, adminModal].forEach((modal) => {
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeModal(modal);
+      });
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        [detailModal, uploadModal, adminModal].forEach((modal) => {
+          if (modal.getAttribute('aria-hidden') === 'false') closeModal(modal);
+        });
+      }
+    });
+    document.querySelector('#report-submit').addEventListener('click', submitReport);
+    uploadForm.addEventListener('submit', submitUpload);
+    window.addEventListener('physix-three-ready', () => {
+      if (state.selectedPart) renderDetailViewer(state.selectedPart);
+    });
+    window.addEventListener('hashchange', () => {
+      const match = window.location.hash.match(/^#part=(.+)$/);
+      if (match) openDetail(decodeURIComponent(match[1]));
     });
 
     const partsRequest = fetch('/api/parts').then((response) => response.json());
     const votesRequest = fetch(`/api/votes?voter_id=${encodeURIComponent(state.clientId)}`)
       .then((response) => response.ok ? response.json() : { votes: {}, user_votes: {} })
       .catch(() => ({ votes: {}, user_votes: {} }));
+    const collectionsRequest = fetch('/api/collections')
+      .then((response) => response.ok ? response.json() : { collections: [] })
+      .catch(() => ({ collections: [] }));
 
-    Promise.all([partsRequest, votesRequest])
-      .then(([data, voteData]) => {
+    Promise.all([partsRequest, votesRequest, collectionsRequest])
+      .then(([data, voteData, collectionData]) => {
         state.parts = data.parts;
         state.categories = data.categories || [...new Set(data.parts.map((part) => part.category))].sort();
         state.votes = voteData.votes || {};
         state.userVotes = voteData.user_votes || {};
+        state.collections = collectionData.collections || [];
         document.querySelector('#stat-models').textContent = data.count.toLocaleString();
         document.querySelector('#stat-categories').textContent = state.categories.length.toLocaleString();
         document.querySelector('#stat-images').textContent = data.parts.filter((part) => part.media?.image_url).length.toLocaleString();
+        renderAdvancedFilterOptions();
+        renderCollections();
         renderFilters();
         render();
+        const match = window.location.hash.match(/^#part=(.+)$/);
+        if (match) openDetail(decodeURIComponent(match[1]));
       })
       .catch(() => {
         resultCount.textContent = 'Catalog API unavailable';
