@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import sqlite3
 import ssl
 import time
 import zipfile
@@ -27,11 +28,14 @@ DATABASE_PATH = ROOT / "database.json"
 VOTES_PATH = ROOT / "votes.json"
 REPORTS_PATH = ROOT / "reports.json"
 UPLOADS_PATH = ROOT / "uploads.json"
+APP_DB_PATH = ROOT / "physixcad.sqlite3"
 PRESENCE_TIMEOUT_SECONDS = 45.0
 
 vote_lock = Lock()
 report_lock = Lock()
 upload_lock = Lock()
+request_lock = Lock()
+profile_lock = Lock()
 presence_lock = Lock()
 active_clients: dict[str, float] = {}
 
@@ -132,6 +136,27 @@ class UploadRequest(BaseModel):
     competition_relevance: list[str] = []
 
 
+class ProfileRequest(BaseModel):
+    client_id: str
+    display_name: str = ""
+    email: str = ""
+    role: str = "Student engineer"
+    team: str = ""
+
+
+class FavoriteRequest(BaseModel):
+    client_id: str
+
+
+class ModelRequestPayload(BaseModel):
+    requester_id: str
+    name: str
+    category: str = "General Engineering"
+    use_case: str = ""
+    details: str = ""
+    priority: str = "normal"
+
+
 def load_database() -> dict[str, Any]:
     with DATABASE_PATH.open("r", encoding="utf-8") as fp:
         return json.load(fp)
@@ -153,8 +178,155 @@ def save_json_store(path: Path, store: dict[str, Any]) -> None:
     temp_path.replace(path)
 
 
+def db_connect() -> sqlite3.Connection:
+    connection = sqlite3.connect(APP_DB_PATH)
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
+def init_app_db() -> None:
+    with db_connect() as connection:
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS votes (
+                part_id TEXT NOT NULL,
+                voter_id TEXT NOT NULL,
+                vote TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (part_id, voter_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS reports (
+                id TEXT PRIMARY KEY,
+                part_id TEXT NOT NULL,
+                part_name TEXT NOT NULL,
+                reporter_id TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                detail TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS uploads (
+                part_id TEXT PRIMARY KEY,
+                submitter_id TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS users (
+                client_id TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                role TEXT NOT NULL,
+                team TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS favorites (
+                client_id TEXT NOT NULL,
+                part_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (client_id, part_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS model_requests (
+                id TEXT PRIMARY KEY,
+                requester_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                use_case TEXT NOT NULL,
+                details TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            """
+        )
+        connection.commit()
+    migrate_legacy_json_stores()
+
+
+def migrate_legacy_json_stores() -> None:
+    with db_connect() as connection:
+        if VOTES_PATH.exists() and connection.execute("SELECT COUNT(*) FROM votes").fetchone()[0] == 0:
+            try:
+                vote_store = load_vote_store_json()
+                for part_id, record in vote_store.get("parts", {}).items():
+                    for voter_id, vote in record.get("voters", {}).items():
+                        if vote in {"genuine", "not_genuine"}:
+                            connection.execute(
+                                """
+                                INSERT OR IGNORE INTO votes
+                                    (part_id, voter_id, vote, created_at, updated_at)
+                                VALUES (?, ?, ?, ?, ?)
+                                """,
+                                (
+                                    part_id,
+                                    voter_id,
+                                    vote,
+                                    record.get("created_at") or utc_timestamp(),
+                                    record.get("updated_at") or utc_timestamp(),
+                                ),
+                            )
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        if REPORTS_PATH.exists() and connection.execute("SELECT COUNT(*) FROM reports").fetchone()[0] == 0:
+            try:
+                for report in load_json_store(REPORTS_PATH, "reports").get("reports", []):
+                    connection.execute(
+                        """
+                        INSERT OR IGNORE INTO reports
+                            (id, part_id, part_name, reporter_id, reason, detail, status, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            report.get("id") or f"report-{int(time.time())}",
+                            report.get("part_id", ""),
+                            report.get("part_name", ""),
+                            report.get("reporter_id", ""),
+                            report.get("reason", ""),
+                            report.get("detail", ""),
+                            report.get("status", "open"),
+                            report.get("created_at") or utc_timestamp(),
+                        ),
+                    )
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        if UPLOADS_PATH.exists() and connection.execute("SELECT COUNT(*) FROM uploads").fetchone()[0] == 0:
+            try:
+                for part in load_json_store(UPLOADS_PATH, "uploads").get("uploads", []):
+                    connection.execute(
+                        """
+                        INSERT OR IGNORE INTO uploads
+                            (part_id, submitter_id, payload_json, created_at)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (
+                            part.get("id"),
+                            part.get("submitter_id", "legacy-json"),
+                            json.dumps(part, sort_keys=True),
+                            part.get("created_at") or utc_timestamp(),
+                        ),
+                    )
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        connection.commit()
+
+
+def load_db_uploads() -> list[dict[str, Any]]:
+    with db_connect() as connection:
+        rows = connection.execute("SELECT payload_json FROM uploads ORDER BY created_at DESC").fetchall()
+    return [json.loads(row["payload_json"]) for row in rows]
+
+
 def load_uploaded_parts() -> list[dict[str, Any]]:
-    return load_json_store(UPLOADS_PATH, "uploads").get("uploads", [])
+    return load_db_uploads()
 
 
 def list_parts() -> list[dict[str, Any]]:
@@ -164,7 +336,7 @@ def list_parts() -> list[dict[str, Any]]:
 def get_part(part_id: str) -> dict[str, Any]:
     for part in list_parts():
         if part["id"] == part_id:
-            return part
+            return enrich_part(part)
     raise HTTPException(status_code=404, detail=f"Unknown part id: {part_id}")
 
 
@@ -183,20 +355,60 @@ def clean_client_id(client_id: str) -> str:
     return client_id
 
 
-def load_vote_store() -> dict[str, Any]:
+def load_vote_store_json() -> dict[str, Any]:
     if not VOTES_PATH.exists():
         return {"parts": {}, "created_at": utc_timestamp(), "updated_at": utc_timestamp()}
     with VOTES_PATH.open("r", encoding="utf-8") as fp:
         return json.load(fp)
 
 
+def load_vote_store() -> dict[str, Any]:
+    with db_connect() as connection:
+        rows = connection.execute(
+            "SELECT part_id, voter_id, vote, created_at, updated_at FROM votes"
+        ).fetchall()
+    store: dict[str, Any] = {"parts": {}, "created_at": utc_timestamp(), "updated_at": utc_timestamp()}
+    for row in rows:
+        record = store["parts"].setdefault(
+            row["part_id"],
+            {
+                "voters": {},
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            },
+        )
+        record["voters"][row["voter_id"]] = row["vote"]
+        if row["updated_at"] > record.get("updated_at", ""):
+            record["updated_at"] = row["updated_at"]
+    return store
+
+
 def save_vote_store(store: dict[str, Any]) -> None:
-    store["updated_at"] = utc_timestamp()
-    temp_path = VOTES_PATH.with_suffix(".json.tmp")
-    with temp_path.open("w", encoding="utf-8") as fp:
-        json.dump(store, fp, indent=2, sort_keys=True)
-        fp.write("\n")
-    temp_path.replace(VOTES_PATH)
+    now = utc_timestamp()
+    with db_connect() as connection:
+        connection.execute("DELETE FROM votes")
+        for part_id, record in store.get("parts", {}).items():
+            for voter_id, vote in record.get("voters", {}).items():
+                if vote not in {"genuine", "not_genuine"}:
+                    continue
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO votes
+                        (part_id, voter_id, vote, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        part_id,
+                        voter_id,
+                        vote,
+                        record.get("created_at") or now,
+                        record.get("updated_at") or now,
+                    ),
+                )
+        connection.commit()
+
+
+init_app_db()
 
 
 def summarize_vote_record(record: dict[str, Any] | None) -> dict[str, Any]:
@@ -518,6 +730,113 @@ def primary_material(part: dict[str, Any]) -> str:
     return "Material metadata pending"
 
 
+def license_profile(part: dict[str, Any]) -> dict[str, Any]:
+    cad = part.get("cad", {})
+    license_name = str(cad.get("license") or "License not specified").strip()
+    license_key = license_name.lower()
+    source_type = cad.get("source_type") or ("procedural" if "PhysixCAD" in str(cad.get("repository", "")) else "public_source")
+    commercial_use = "verify"
+    redistribution = "verify"
+    attribution_required = "verify"
+    notes = "Verify the source page before commercial redistribution."
+
+    if "cc0" in license_key or "public domain" in license_key:
+        commercial_use = "allowed"
+        redistribution = "allowed"
+        attribution_required = "not_required"
+        notes = "CC0-style source; attribution is still recommended for engineering traceability."
+    elif "cc-by" in license_key or "cc by" in license_key:
+        commercial_use = "allowed_with_attribution"
+        redistribution = "allowed_with_attribution"
+        attribution_required = "required"
+        notes = "Credit the original CAD/source repository when reusing or redistributing."
+    elif source_type == "user_upload":
+        commercial_use = "unknown"
+        redistribution = "unknown"
+        attribution_required = "unknown"
+        notes = "Community upload; verify ownership and license before production use."
+
+    return {
+        "license": license_name,
+        "source_type": source_type,
+        "repository": cad.get("repository", "Unknown source"),
+        "source_page": cad.get("source_page", ""),
+        "download_url": cad.get("download_url", ""),
+        "commercial_use": commercial_use,
+        "redistribution": redistribution,
+        "attribution_required": attribution_required,
+        "notes": notes,
+    }
+
+
+def simulation_readiness(part: dict[str, Any]) -> dict[str, Any]:
+    cad = part.get("cad", {})
+    physics = part.get("physics", {})
+    media = part.get("media", {})
+    quality = part.get("metadata_quality", {})
+    checks: list[dict[str, Any]] = []
+
+    def add_check(key: str, label: str, passed: bool, points: int) -> int:
+        checks.append({"key": key, "label": label, "passed": passed, "points": points if passed else 0})
+        return points if passed else 0
+
+    score = 0
+    score += add_check("cad_file", "CAD download or generated model available", bool(cad.get("download_url") or cad.get("source_type") == "procedural"), 16)
+    score += add_check("cad_format", "CAD format declared", bool(cad.get("format") and cad.get("filename")), 8)
+    score += add_check("source_license", "Source and license documented", bool(cad.get("source_page") and cad.get("license")), 14)
+    score += add_check("mass", "Mass metadata present", float(physics.get("mass_grams") or 0) > 0, 12)
+    score += add_check("material", "Material composition present", bool(physics.get("material_composition")), 12)
+    center = physics.get("center_of_mass_mm") or {}
+    score += add_check("center_of_mass", "Center of mass coordinates present", all(axis in center for axis in ("x", "y", "z")), 12)
+    score += add_check("constraints", "Joint or assembly constraint defined", bool(physics.get("joint_constraints")), 10)
+    score += add_check("motion", "Motion/torque/RPM metadata present", bool(physics.get("motion")), 8)
+    score += add_check("image", "Visual part image available", bool(media.get("image_url")), 4)
+    score += add_check("review", "No vendor review warning", not bool(quality.get("requires_vendor_review")), 4)
+
+    missing = [check["label"] for check in checks if not check["passed"]]
+    if score >= 90:
+        grade = "A"
+        status = "Simulation ready"
+    elif score >= 78:
+        grade = "B"
+        status = "Ready for prototyping"
+    elif score >= 62:
+        grade = "C"
+        status = "Needs engineering review"
+    else:
+        grade = "D"
+        status = "Metadata incomplete"
+    return {"score": score, "grade": grade, "status": status, "checks": checks, "missing": missing}
+
+
+def physix_verified(part: dict[str, Any]) -> dict[str, Any]:
+    profile = license_profile(part)
+    readiness = simulation_readiness(part)
+    quality = part.get("metadata_quality", {})
+    requires_review = bool(quality.get("requires_vendor_review"))
+    source_ok = profile["source_type"] in {"public_source", "procedural"}
+    verified = source_ok and not requires_review and readiness["score"] >= 82
+    return {
+        "verified": verified,
+        "label": "PhysixCAD Verified" if verified else "Engineering Review Needed",
+        "reason": "Source, license, CAD, and physics metadata are complete enough for simulation prototyping."
+        if verified
+        else "Use this model as a starting point and verify dimensions/metadata before critical engineering work.",
+    }
+
+
+def enrich_part(part: dict[str, Any]) -> dict[str, Any]:
+    enriched = dict(part)
+    enriched["license_profile"] = license_profile(part)
+    enriched["simulation_readiness"] = simulation_readiness(part)
+    enriched["physix_verification"] = physix_verified(part)
+    return enriched
+
+
+def enriched_parts() -> list[dict[str, Any]]:
+    return [enrich_part(part) for part in list_parts()]
+
+
 def clean_upload_text(value: str, fallback: str, max_length: int = 180) -> str:
     value = re.sub(r"\s+", " ", str(value or "")).strip()
     return (value or fallback)[:max_length]
@@ -585,6 +904,142 @@ def build_uploaded_part(payload: UploadRequest) -> dict[str, Any]:
         },
         "created_at": utc_timestamp(),
     }
+
+
+def upsert_profile(payload: ProfileRequest) -> dict[str, Any]:
+    client_id = clean_client_id(payload.client_id)
+    now = utc_timestamp()
+    display_name = clean_upload_text(payload.display_name, "PhysixCAD Engineer", 80)
+    email = clean_upload_text(payload.email, "", 120)
+    role = clean_upload_text(payload.role, "Student engineer", 80)
+    team = clean_upload_text(payload.team, "", 120)
+    with db_connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO users (client_id, display_name, email, role, team, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(client_id) DO UPDATE SET
+                display_name = excluded.display_name,
+                email = excluded.email,
+                role = excluded.role,
+                team = excluded.team,
+                updated_at = excluded.updated_at
+            """,
+            (client_id, display_name, email, role, team, now, now),
+        )
+        connection.commit()
+    return get_profile(client_id)
+
+
+def get_profile(client_id: str) -> dict[str, Any]:
+    client_id = clean_client_id(client_id)
+    with db_connect() as connection:
+        row = connection.execute(
+            "SELECT client_id, display_name, email, role, team, created_at, updated_at FROM users WHERE client_id = ?",
+            (client_id,),
+        ).fetchone()
+    if not row:
+        return {
+            "client_id": client_id,
+            "display_name": "",
+            "email": "",
+            "role": "",
+            "team": "",
+            "created_at": None,
+            "updated_at": None,
+        }
+    return dict(row)
+
+
+def favorite_ids(client_id: str) -> list[str]:
+    client_id = clean_client_id(client_id)
+    with db_connect() as connection:
+        rows = connection.execute(
+            "SELECT part_id FROM favorites WHERE client_id = ? ORDER BY created_at DESC",
+            (client_id,),
+        ).fetchall()
+    return [row["part_id"] for row in rows]
+
+
+def favorite_parts(client_id: str) -> list[dict[str, Any]]:
+    ids = set(favorite_ids(client_id))
+    return [part for part in enriched_parts() if part["id"] in ids]
+
+
+def toggle_favorite(client_id: str, part_id: str) -> dict[str, Any]:
+    client_id = clean_client_id(client_id)
+    get_part(part_id)
+    with db_connect() as connection:
+        exists = connection.execute(
+            "SELECT 1 FROM favorites WHERE client_id = ? AND part_id = ?",
+            (client_id, part_id),
+        ).fetchone()
+        if exists:
+            connection.execute(
+                "DELETE FROM favorites WHERE client_id = ? AND part_id = ?",
+                (client_id, part_id),
+            )
+            favorited = False
+        else:
+            connection.execute(
+                "INSERT INTO favorites (client_id, part_id, created_at) VALUES (?, ?, ?)",
+                (client_id, part_id, utc_timestamp()),
+            )
+            favorited = True
+        connection.commit()
+    ids = favorite_ids(client_id)
+    return {"part_id": part_id, "favorited": favorited, "favorite_ids": ids, "count": len(ids)}
+
+
+def create_model_request(payload: ModelRequestPayload) -> dict[str, Any]:
+    requester_id = clean_client_id(payload.requester_id)
+    request = {
+        "id": f"request-{safe_package_name(payload.name)}-{int(time.time())}",
+        "requester_id": requester_id,
+        "name": clean_upload_text(payload.name, "Requested CAD model", 120),
+        "category": clean_upload_text(payload.category, "General Engineering", 80),
+        "use_case": clean_upload_text(payload.use_case, "", 220),
+        "details": clean_upload_text(payload.details, "", 800),
+        "priority": clean_upload_text(payload.priority, "normal", 40),
+        "status": "open",
+        "created_at": utc_timestamp(),
+    }
+    with db_connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO model_requests
+                (id, requester_id, name, category, use_case, details, priority, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                request["id"],
+                request["requester_id"],
+                request["name"],
+                request["category"],
+                request["use_case"],
+                request["details"],
+                request["priority"],
+                request["status"],
+                request["created_at"],
+            ),
+        )
+        connection.commit()
+    return request
+
+
+def list_model_requests(limit: int = 30) -> list[dict[str, Any]]:
+    limit = max(1, min(100, int(limit)))
+    with db_connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT id, requester_id, name, category, use_case, details, priority, status, created_at
+            FROM model_requests
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def engine_export_payload(part: dict[str, Any], engine: str) -> dict[str, Any]:
@@ -675,6 +1130,9 @@ def build_smart_package(part: dict[str, Any]) -> BytesIO:
                     "media": part.get("media"),
                     "competition_relevance": part.get("competition_relevance", []),
                     "metadata_quality": part.get("metadata_quality"),
+                    "simulation_readiness": part.get("simulation_readiness") or simulation_readiness(part),
+                    "license_profile": part.get("license_profile") or license_profile(part),
+                    "physix_verification": part.get("physix_verification") or physix_verified(part),
                 },
                 indent=2,
             )
@@ -742,7 +1200,7 @@ def health() -> dict[str, Any]:
 @app.get("/api/parts")
 def api_parts() -> dict[str, Any]:
     data = load_database()
-    parts = list_parts()
+    parts = enriched_parts()
     return {
         "count": len(parts),
         "catalog": data.get("catalog", {}),
@@ -766,6 +1224,33 @@ def api_part_cad(part_id: str):
             headers={"Content-Disposition": f'attachment; filename="{part["cad"]["filename"]}"'},
         )
     return RedirectResponse(part["cad"]["download_url"])
+
+
+@app.get("/api/parts/{part_id}/preview-stl")
+def api_part_preview_stl(part_id: str) -> StreamingResponse:
+    part = get_part(part_id)
+    cad = part.get("cad", {})
+    stl_bytes: bytes
+    status = "generated-fallback"
+    try:
+        if cad.get("source_type") == "procedural":
+            stl_bytes = procedural_stl(part)
+            status = "generated-procedural"
+        elif str(cad.get("filename", "")).lower().endswith(".stl") or str(cad.get("download_url", "")).lower().split("?", 1)[0].endswith(".stl"):
+            stl_bytes, _ = fetch_remote_asset(cad["download_url"], timeout_seconds=8.0)
+            status = "source-stl"
+        else:
+            stl_bytes = box_mesh_stl(part["name"], fallback_dimensions(part)).encode("utf-8")
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError):
+        stl_bytes = box_mesh_stl(part["name"], fallback_dimensions(part)).encode("utf-8")
+    return StreamingResponse(
+        BytesIO(stl_bytes),
+        media_type="model/stl",
+        headers={
+            "Content-Disposition": f'inline; filename="{safe_package_name(part_id)}-preview.stl"',
+            "X-PhysixCAD-Preview": status,
+        },
+    )
 
 
 @app.get("/api/votes")
@@ -838,6 +1323,63 @@ def api_collections() -> dict[str, Any]:
     return {"count": len(COLLECTIONS), "collections": COLLECTIONS}
 
 
+@app.get("/api/compare")
+def api_compare(ids: str = Query(..., description="Comma-separated part ids to compare, up to four.")) -> dict[str, Any]:
+    requested_ids = [part_id.strip() for part_id in ids.split(",") if part_id.strip()]
+    if not 2 <= len(requested_ids) <= 4:
+        raise HTTPException(status_code=400, detail="Compare requires 2 to 4 part ids.")
+    parts = [get_part(part_id) for part_id in requested_ids]
+    metrics = [
+        {"key": "mass_grams", "label": "Mass (g)", "values": {part["id"]: part["physics"].get("mass_grams") for part in parts}},
+        {"key": "material", "label": "Material", "values": {part["id"]: primary_material(part) for part in parts}},
+        {"key": "motion", "label": "Motion", "values": {part["id"]: part["physics"].get("motion", {}) for part in parts}},
+        {"key": "constraint", "label": "Constraint", "values": {part["id"]: part["physics"].get("joint_constraints", [{}])[0] for part in parts}},
+        {"key": "readiness", "label": "Readiness", "values": {part["id"]: part["simulation_readiness"]["score"] for part in parts}},
+        {"key": "license", "label": "License", "values": {part["id"]: part["license_profile"]["license"] for part in parts}},
+    ]
+    return {"count": len(parts), "parts": parts, "metrics": metrics, "generated_at": utc_timestamp()}
+
+
+@app.get("/api/profile")
+def api_profile(client_id: str = Query(...)) -> dict[str, Any]:
+    profile = get_profile(client_id)
+    favorites = favorite_ids(client_id)
+    return {"profile": profile, "favorite_ids": favorites, "favorite_count": len(favorites)}
+
+
+@app.post("/api/profile")
+def api_save_profile(payload: ProfileRequest) -> dict[str, Any]:
+    with profile_lock:
+        profile = upsert_profile(payload)
+    favorites = favorite_ids(payload.client_id)
+    return {"ok": True, "profile": profile, "favorite_ids": favorites, "favorite_count": len(favorites)}
+
+
+@app.get("/api/favorites")
+def api_favorites(client_id: str = Query(...)) -> dict[str, Any]:
+    favorites = favorite_parts(client_id)
+    return {"count": len(favorites), "favorite_ids": [part["id"] for part in favorites], "parts": favorites}
+
+
+@app.post("/api/parts/{part_id}/favorite")
+def api_toggle_favorite(part_id: str, payload: FavoriteRequest) -> dict[str, Any]:
+    with profile_lock:
+        return toggle_favorite(payload.client_id, part_id)
+
+
+@app.post("/api/model-requests")
+def api_create_model_request(payload: ModelRequestPayload) -> dict[str, Any]:
+    with request_lock:
+        request = create_model_request(payload)
+    return {"ok": True, "request": request}
+
+
+@app.get("/api/model-requests")
+def api_model_requests(limit: int = Query(30, ge=1, le=100)) -> dict[str, Any]:
+    requests = list_model_requests(limit)
+    return {"count": len(requests), "requests": requests}
+
+
 @app.post("/api/uploads")
 def api_upload_model(payload: UploadRequest) -> dict[str, Any]:
     submitter_id = clean_client_id(payload.submitter_id)
@@ -847,10 +1389,16 @@ def api_upload_model(payload: UploadRequest) -> dict[str, Any]:
     part = build_uploaded_part(payload)
     part["submitter_id"] = submitter_id
     with upload_lock:
-        store = load_json_store(UPLOADS_PATH, "uploads")
-        store.setdefault("uploads", []).append(part)
-        save_json_store(UPLOADS_PATH, store)
-    return {"ok": True, "part": part}
+        with db_connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO uploads (part_id, submitter_id, payload_json, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (part["id"], submitter_id, json.dumps(part, sort_keys=True), part["created_at"]),
+            )
+            connection.commit()
+    return {"ok": True, "part": enrich_part(part)}
 
 
 @app.get("/api/uploads")
@@ -876,9 +1424,25 @@ def api_report_part(part_id: str, payload: ReportRequest) -> dict[str, Any]:
         "status": "open",
     }
     with report_lock:
-        store = load_json_store(REPORTS_PATH, "reports")
-        store.setdefault("reports", []).append(report)
-        save_json_store(REPORTS_PATH, store)
+        with db_connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO reports
+                    (id, part_id, part_name, reporter_id, reason, detail, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    report["id"],
+                    report["part_id"],
+                    report["part_name"],
+                    report["reporter_id"],
+                    report["reason"],
+                    report["detail"],
+                    report["status"],
+                    report["created_at"],
+                ),
+            )
+            connection.commit()
     return {"ok": True, "report": report}
 
 
@@ -897,10 +1461,23 @@ def api_engine_export(part_id: str, engine: str) -> StreamingResponse:
 
 @app.get("/api/admin/stats")
 def api_admin_stats() -> dict[str, Any]:
-    parts = list_parts()
+    parts = enriched_parts()
     with vote_lock:
         vote_store = load_vote_store()
-    reports = load_json_store(REPORTS_PATH, "reports").get("reports", [])
+    with db_connect() as connection:
+        reports = [
+            dict(row)
+            for row in connection.execute(
+                """
+                SELECT id, part_id, part_name, reporter_id, reason, detail, status, created_at
+                FROM reports
+                ORDER BY created_at DESC
+                """
+            ).fetchall()
+        ]
+        user_count = connection.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        favorite_count = connection.execute("SELECT COUNT(*) FROM favorites").fetchone()[0]
+        request_count = connection.execute("SELECT COUNT(*) FROM model_requests WHERE status = 'open'").fetchone()[0]
     uploads = load_uploaded_parts()
 
     vote_summaries = {
@@ -922,14 +1499,22 @@ def api_admin_stats() -> dict[str, Any]:
         if summary["downvotes"] > summary["upvotes"] and summary["total"] > 0
     ][:20]
     open_reports = [report for report in reports if report.get("status") == "open"]
+    readiness_scores = [part.get("simulation_readiness", {}).get("score", 0) for part in parts]
+    verified_count = sum(1 for part in parts if part.get("physix_verification", {}).get("verified"))
     return {
         "models": len(parts),
         "categories": len({part["category"] for part in parts}),
         "community_uploads": len(uploads),
         "total_votes": sum(summary["total"] for summary in vote_summaries.values()),
         "open_reports": len(open_reports),
+        "model_requests": request_count,
+        "profiles": user_count,
+        "favorites": favorite_count,
+        "physix_verified": verified_count,
+        "average_readiness": round(sum(readiness_scores) / len(readiness_scores), 1) if readiness_scores else 0,
         "flagged_by_votes": flagged_by_votes,
-        "latest_reports": open_reports[-10:],
+        "latest_reports": open_reports[:10],
+        "latest_requests": list_model_requests(10),
         "top_verified": top_verified,
         "collections": len(COLLECTIONS),
         "generated_at": utc_timestamp(),

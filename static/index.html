@@ -204,6 +204,24 @@
             <i data-lucide="layout-dashboard" class="h-4 w-4"></i>
             Admin Dashboard
           </button>
+          <button id="request-open" class="inline-flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-sm font-semibold text-slate-200 transition hover:border-lime-300/50 hover:text-lime-100" type="button">
+            <i data-lucide="clipboard-plus" class="h-4 w-4"></i>
+            Request Model
+          </button>
+          <button id="profile-open" class="inline-flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-sm font-semibold text-slate-200 transition hover:border-sky-300/50 hover:text-sky-100" type="button">
+            <i data-lucide="user-round" class="h-4 w-4"></i>
+            Profile
+          </button>
+          <button id="favorites-toggle" class="inline-flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-sm font-semibold text-slate-200 transition hover:border-pink-300/50 hover:text-pink-100" type="button" aria-pressed="false">
+            <i data-lucide="star" class="h-4 w-4"></i>
+            Favorites
+            <span id="favorite-count" class="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">0</span>
+          </button>
+          <button id="compare-open" class="inline-flex h-10 items-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-sm font-semibold text-slate-200 transition hover:border-cyan-300/50 hover:text-cyan-100" type="button" disabled>
+            <i data-lucide="columns-3" class="h-4 w-4"></i>
+            Compare
+            <span id="compare-count" class="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">0</span>
+          </button>
         </div>
         <div class="text-xs uppercase text-slate-500">Simulation Teams Workspace</div>
       </section>
@@ -248,6 +266,7 @@
             Sort
             <select id="sort-filter" class="control-input mt-1 text-sm normal-case">
               <option value="trust-desc">Highest trust</option>
+              <option value="readiness-desc">Highest readiness</option>
               <option value="votes-desc">Most votes</option>
               <option value="mass-asc">Lightest</option>
               <option value="mass-desc">Heaviest</option>
@@ -263,6 +282,14 @@
           <label class="inline-flex items-center gap-2 text-slate-300">
             <input id="needs-review-only" type="checkbox" class="h-4 w-4 accent-rose-300">
             Needs review only
+          </label>
+          <label class="inline-flex items-center gap-2 text-slate-300">
+            <input id="physix-verified-only" type="checkbox" class="h-4 w-4 accent-cyan-300">
+            PhysixCAD verified only
+          </label>
+          <label class="inline-flex items-center gap-2 text-slate-300">
+            <input id="favorites-only" type="checkbox" class="h-4 w-4 accent-pink-300">
+            Favorites only
           </label>
           <button id="reset-filters" class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-xs font-semibold text-slate-200 transition hover:border-cyan-300/50 hover:text-cyan-100" type="button">
             <i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i>
@@ -286,6 +313,29 @@
           Load More
         </button>
       </div>
+
+      <section class="mt-8 border-y border-slate-700/70 py-7">
+        <div class="grid gap-5 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+          <div>
+            <p class="text-xs font-semibold uppercase text-lime-200">Why PhysixCAD</p>
+            <h2 class="mt-2 text-2xl font-semibold text-white">CAD files should carry simulation intelligence.</h2>
+          </div>
+          <div class="grid gap-3 text-sm sm:grid-cols-3">
+            <div class="rounded-md border border-slate-700/80 bg-slate-950/50 p-4">
+              <span class="text-xs uppercase text-slate-500">Static CAD</span>
+              <p class="mt-2 leading-5 text-slate-300">Geometry-only downloads still need manual cleanup, metadata entry, and source checking.</p>
+            </div>
+            <div class="rounded-md border border-cyan-300/30 bg-cyan-300/10 p-4">
+              <span class="text-xs uppercase text-cyan-100">Smart CAD</span>
+              <p class="mt-2 leading-5 text-slate-200">Each asset pairs geometry with mass, material, center of mass, constraints, license, and readiness data.</p>
+            </div>
+            <div class="rounded-md border border-lime-300/30 bg-lime-300/10 p-4">
+              <span class="text-xs uppercase text-lime-100">Faster Simulation</span>
+              <p class="mt-2 leading-5 text-slate-200">Teams can move from part search to Unity, Unreal, MATLAB, or ROS/Gazebo prototypes sooner.</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section id="about" class="mt-8 border-t border-slate-700/70 py-7">
         <div class="grid gap-4 md:grid-cols-[0.9fr_1.4fr] md:items-start">
@@ -348,6 +398,21 @@
           </div>
         </div>
         <div class="specs mb-4 rounded-md border border-slate-700/70 bg-black/20 px-3 py-2 text-sm"></div>
+        <div class="mb-4 grid gap-2 sm:grid-cols-2">
+          <div class="rounded-md border border-cyan-300/25 bg-cyan-300/10 p-3">
+            <p class="text-[10px] font-semibold uppercase text-cyan-100">Simulation Readiness</p>
+            <div class="mt-1 flex items-end justify-between gap-2">
+              <strong class="readiness-score text-xl text-white">0</strong>
+              <span class="readiness-grade rounded border border-cyan-300/35 bg-black/25 px-2 py-1 text-[10px] font-semibold uppercase text-cyan-100">Grade</span>
+            </div>
+            <p class="readiness-status mt-1 text-xs text-slate-400"></p>
+          </div>
+          <div class="rounded-md border border-slate-700/70 bg-slate-950/50 p-3">
+            <p class="text-[10px] font-semibold uppercase text-slate-500">License</p>
+            <p class="license-name mt-1 truncate text-sm font-semibold text-slate-100"></p>
+            <p class="license-use mt-1 text-xs text-slate-500"></p>
+          </div>
+        </div>
         <div class="vote-panel mb-4 rounded-md border border-slate-700/70 bg-slate-950/50 p-3">
           <div class="flex items-start justify-between gap-3">
             <div>
@@ -379,7 +444,15 @@
           <p class="vote-confidence mt-2 text-xs text-slate-500">No votes yet</p>
         </div>
         <div class="competition-tags mb-4 flex flex-wrap gap-1.5"></div>
-        <div class="mt-auto grid gap-2 sm:grid-cols-2">
+        <div class="mt-auto grid gap-2 sm:grid-cols-4">
+          <button class="favorite-btn inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-sm font-semibold text-slate-100 transition hover:border-pink-300/50 hover:text-pink-100" type="button" aria-pressed="false">
+            <i data-lucide="star" class="h-4 w-4"></i>
+            Save
+          </button>
+          <button class="compare-btn inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-sm font-semibold text-slate-100 transition hover:border-cyan-300/50 hover:text-cyan-100" type="button" aria-pressed="false">
+            <i data-lucide="columns-3" class="h-4 w-4"></i>
+            Compare
+          </button>
           <button class="details-btn inline-flex h-11 items-center justify-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-4 text-sm font-semibold text-slate-100 transition hover:border-cyan-300/50 hover:text-cyan-100" type="button">
             <i data-lucide="scan-search" class="h-4 w-4"></i>
             View Details
@@ -514,6 +587,76 @@
     </div>
   </div>
 
+  <div id="profile-modal" class="modal-backdrop fixed inset-0 z-50 bg-black/70 px-4 py-6 backdrop-blur-sm" aria-hidden="true">
+    <form id="profile-form" class="modal-panel mx-auto flex w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+        <div>
+          <p class="text-xs font-semibold uppercase text-sky-200">Engineer Profile</p>
+          <h2 class="mt-1 text-xl font-semibold text-white">Save Your Workspace</h2>
+        </div>
+        <button class="modal-close grid h-9 w-9 place-items-center rounded-md border border-slate-700 bg-slate-950/70 text-slate-300 hover:border-cyan-300/50 hover:text-cyan-100" type="button" title="Close">
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </div>
+      <div class="grid gap-3 p-5 sm:grid-cols-2">
+        <label class="text-xs uppercase text-slate-500">Name<input name="display_name" class="control-input mt-1 text-sm normal-case" placeholder="Ayush Parekh"></label>
+        <label class="text-xs uppercase text-slate-500">Email<input name="email" class="control-input mt-1 text-sm normal-case" type="email" placeholder="you@example.com"></label>
+        <label class="text-xs uppercase text-slate-500">Role<input name="role" class="control-input mt-1 text-sm normal-case" placeholder="Student engineer"></label>
+        <label class="text-xs uppercase text-slate-500">Team / Company<input name="team" class="control-input mt-1 text-sm normal-case" placeholder="Robotics team, class, or company"></label>
+      </div>
+      <div class="flex items-center justify-between gap-3 border-t border-slate-700 px-5 py-4">
+        <p id="profile-status" class="text-sm text-slate-400"></p>
+        <button class="inline-flex h-10 items-center gap-2 rounded-md border border-sky-300/50 bg-sky-300/12 px-4 text-sm font-semibold text-sky-50 transition hover:bg-sky-300/20" type="submit">
+          <i data-lucide="save" class="h-4 w-4"></i>
+          Save Profile
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div id="request-modal" class="modal-backdrop fixed inset-0 z-50 bg-black/70 px-4 py-6 backdrop-blur-sm" aria-hidden="true">
+    <form id="request-form" class="modal-panel mx-auto flex w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+        <div>
+          <p class="text-xs font-semibold uppercase text-lime-200">Model Request</p>
+          <h2 class="mt-1 text-xl font-semibold text-white">Ask PhysixCAD To Add A Part</h2>
+        </div>
+        <button class="modal-close grid h-9 w-9 place-items-center rounded-md border border-slate-700 bg-slate-950/70 text-slate-300 hover:border-cyan-300/50 hover:text-cyan-100" type="button" title="Close">
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </div>
+      <div class="grid gap-3 overflow-y-auto p-5 sm:grid-cols-2">
+        <label class="text-xs uppercase text-slate-500">Part Name<input name="name" class="control-input mt-1 text-sm normal-case" required placeholder="REV NEO Brushless Motor"></label>
+        <label class="text-xs uppercase text-slate-500">Category<input name="category" class="control-input mt-1 text-sm normal-case" value="Actuators & Motors"></label>
+        <label class="text-xs uppercase text-slate-500">Priority<select name="priority" class="control-input mt-1 text-sm normal-case"><option>normal</option><option>competition-critical</option><option>professional-project</option></select></label>
+        <label class="text-xs uppercase text-slate-500">Use Case<input name="use_case" class="control-input mt-1 text-sm normal-case" placeholder="FRC drivetrain, drone frame, MATLAB sim..."></label>
+        <label class="text-xs uppercase text-slate-500 sm:col-span-2">Details<textarea name="details" class="mt-1 min-h-28 w-full rounded-md border border-slate-700 bg-slate-950/70 p-3 text-sm text-slate-100 outline-none focus:border-cyan-300/60" placeholder="Include dimensions, preferred CAD source, competition, or physics data you need."></textarea></label>
+      </div>
+      <div class="flex items-center justify-between gap-3 border-t border-slate-700 px-5 py-4">
+        <p id="request-status" class="text-sm text-slate-400"></p>
+        <button class="inline-flex h-10 items-center gap-2 rounded-md border border-lime-300/50 bg-lime-300/12 px-4 text-sm font-semibold text-lime-50 transition hover:bg-lime-300/20" type="submit">
+          <i data-lucide="send" class="h-4 w-4"></i>
+          Submit Request
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div id="compare-modal" class="modal-backdrop fixed inset-0 z-50 bg-black/70 px-4 py-6 backdrop-blur-sm" aria-hidden="true">
+    <div class="modal-panel mx-auto flex w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-950 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 px-5 py-4">
+        <div>
+          <p class="text-xs font-semibold uppercase text-cyan-200">Part Compare</p>
+          <h2 class="mt-1 text-xl font-semibold text-white">Engineering Tradeoff Table</h2>
+        </div>
+        <button class="modal-close grid h-9 w-9 place-items-center rounded-md border border-slate-700 bg-slate-950/70 text-slate-300 hover:border-cyan-300/50 hover:text-cyan-100" type="button" title="Close">
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </div>
+      <div id="compare-content" class="overflow-y-auto p-5 text-sm text-slate-300"></div>
+    </div>
+  </div>
+
   <script>
     function getClientId() {
       try {
@@ -538,6 +681,9 @@
       collections: [],
       activeCollection: '',
       selectedPart: null,
+      profile: null,
+      favoriteIds: new Set(),
+      compareIds: new Set(),
       filters: {
         material: '',
         format: '',
@@ -546,6 +692,8 @@
         maxMass: '',
         verifiedOnly: false,
         needsReviewOnly: false,
+        physixVerifiedOnly: false,
+        favoritesOnly: false,
         sort: 'trust-desc'
       },
       clientId: getClientId()
@@ -567,12 +715,26 @@
     const sortFilter = document.querySelector('#sort-filter');
     const verifiedOnly = document.querySelector('#verified-only');
     const needsReviewOnly = document.querySelector('#needs-review-only');
+    const physixVerifiedOnly = document.querySelector('#physix-verified-only');
+    const favoritesOnly = document.querySelector('#favorites-only');
+    const favoriteCount = document.querySelector('#favorite-count');
+    const compareCount = document.querySelector('#compare-count');
+    const favoritesToggle = document.querySelector('#favorites-toggle');
+    const compareOpen = document.querySelector('#compare-open');
     const detailModal = document.querySelector('#detail-modal');
     const uploadModal = document.querySelector('#upload-modal');
     const adminModal = document.querySelector('#admin-modal');
+    const profileModal = document.querySelector('#profile-modal');
+    const requestModal = document.querySelector('#request-modal');
+    const compareModal = document.querySelector('#compare-modal');
     const uploadForm = document.querySelector('#upload-form');
+    const profileForm = document.querySelector('#profile-form');
+    const requestForm = document.querySelector('#request-form');
     const uploadStatus = document.querySelector('#upload-status');
+    const profileStatus = document.querySelector('#profile-status');
+    const requestStatus = document.querySelector('#request-status');
     const adminContent = document.querySelector('#admin-content');
+    const compareContent = document.querySelector('#compare-content');
     const canvases = new Map();
     let detailAnimationId = null;
 
@@ -652,6 +814,29 @@
       return part.cad?.repository || 'Public CAD Source';
     }
 
+    function readiness(part) {
+      return part.simulation_readiness || { score: 0, grade: 'D', status: 'Metadata incomplete', checks: [], missing: [] };
+    }
+
+    function licenseProfile(part) {
+      return part.license_profile || {
+        license: part.cad?.license || 'License not specified',
+        commercial_use: 'verify',
+        redistribution: 'verify',
+        attribution_required: 'verify',
+        notes: 'Verify source terms before production use.'
+      };
+    }
+
+    function physixVerified(part) {
+      return Boolean(part.physix_verification?.verified);
+    }
+
+    function licenseUseLabel(profile) {
+      const text = String(profile.commercial_use || 'verify').replaceAll('_', ' ');
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
     function verificationState(partId) {
       const summary = voteSummary(partId);
       if (summary.total >= 3 && summary.genuine_percent >= 75) return { label: 'Community Verified', tone: 'verified' };
@@ -670,11 +855,20 @@
       if (type === 'procedural') score += 8;
       if (type === 'user_upload') score -= 8;
       if (part.media?.image_url) score += 4;
+      if (physixVerified(part)) score += 10;
+      score += Math.round((readiness(part).score - 70) / 8);
       if (part.metadata_quality?.confidence === 'needs_review') score -= 8;
       return Math.max(0, Math.min(100, Math.round(score)));
     }
 
     function applyVerificationBadge(element, part) {
+      if (physixVerified(part)) {
+        element.textContent = 'PhysixCAD Verified';
+        element.style.borderColor = 'rgba(53, 214, 200, 0.62)';
+        element.style.background = 'rgba(53, 214, 200, 0.13)';
+        element.style.color = '#cffafe';
+        return;
+      }
       const stateInfo = verificationState(part.id);
       element.textContent = stateInfo.label;
       if (stateInfo.tone === 'verified') {
@@ -719,6 +913,67 @@
 
     function formatScore(score) {
       return score > 0 ? `+${score}` : String(score);
+    }
+
+    function updateActionCounters() {
+      favoriteCount.textContent = state.favoriteIds.size.toLocaleString();
+      compareCount.textContent = state.compareIds.size.toLocaleString();
+      compareOpen.disabled = state.compareIds.size < 2;
+      compareOpen.style.opacity = state.compareIds.size < 2 ? '0.55' : '1';
+      favoritesToggle.setAttribute('aria-pressed', state.filters.favoritesOnly ? 'true' : 'false');
+      favoritesToggle.style.borderColor = state.filters.favoritesOnly ? 'rgba(244, 114, 182, 0.65)' : 'rgba(51, 65, 85, 0.95)';
+      favoritesToggle.style.background = state.filters.favoritesOnly ? 'rgba(244, 114, 182, 0.12)' : 'rgba(2, 6, 23, 0.72)';
+    }
+
+    function applyFavoriteButtonStyle(button, partId) {
+      const selected = state.favoriteIds.has(partId);
+      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      button.innerHTML = `<i data-lucide="star" class="h-4 w-4"></i>${selected ? 'Saved' : 'Save'}`;
+      button.style.borderColor = selected ? 'rgba(244, 114, 182, 0.72)' : 'rgba(51, 65, 85, 1)';
+      button.style.background = selected ? 'rgba(244, 114, 182, 0.13)' : 'rgba(2, 6, 23, 0.72)';
+      button.style.color = selected ? '#fce7f3' : '#e2e8f0';
+    }
+
+    function applyCompareButtonStyle(button, partId) {
+      const selected = state.compareIds.has(partId);
+      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+      button.innerHTML = `<i data-lucide="columns-3" class="h-4 w-4"></i>${selected ? 'Added' : 'Compare'}`;
+      button.style.borderColor = selected ? 'rgba(53, 214, 200, 0.72)' : 'rgba(51, 65, 85, 1)';
+      button.style.background = selected ? 'rgba(53, 214, 200, 0.13)' : 'rgba(2, 6, 23, 0.72)';
+      button.style.color = selected ? '#cffafe' : '#e2e8f0';
+    }
+
+    async function toggleFavorite(partId, button) {
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/parts/${encodeURIComponent(partId)}/favorite`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ client_id: state.clientId })
+        });
+        if (!response.ok) throw new Error('Favorite request failed');
+        const data = await response.json();
+        state.favoriteIds = new Set(data.favorite_ids || []);
+        updateActionCounters();
+        document.querySelectorAll(`[data-favorite-part="${CSS.escape(partId)}"]`).forEach((node) => applyFavoriteButtonStyle(node, partId));
+        if (state.filters.favoritesOnly) render();
+      } catch {
+        button.textContent = 'Save failed';
+      } finally {
+        button.disabled = false;
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+
+    function toggleCompare(partId) {
+      if (state.compareIds.has(partId)) {
+        state.compareIds.delete(partId);
+      } else if (state.compareIds.size < 4) {
+        state.compareIds.add(partId);
+      }
+      updateActionCounters();
+      document.querySelectorAll(`[data-compare-part="${CSS.escape(partId)}"]`).forEach((node) => applyCompareButtonStyle(node, partId));
+      if (window.lucide) window.lucide.createIcons();
     }
 
     function applyVoteButtonStyle(button, selected, voteType) {
@@ -873,6 +1128,8 @@
         if (state.filters.material && !partMaterialSearch(part).includes(state.filters.material.toLowerCase())) return false;
         if (state.filters.format && part.cad?.format !== state.filters.format) return false;
         if (state.filters.source && sourceLabel(part) !== state.filters.source) return false;
+        if (state.filters.physixVerifiedOnly && !physixVerified(part)) return false;
+        if (state.filters.favoritesOnly && !state.favoriteIds.has(part.id)) return false;
         if (!Number.isNaN(minMass) && massGrams(part) < minMass) return false;
         if (!Number.isNaN(maxMass) && massGrams(part) > maxMass) return false;
         const verification = verificationState(part.id);
@@ -883,6 +1140,7 @@
       });
       return filtered.sort((a, b) => {
         if (state.filters.sort === 'votes-desc') return voteSummary(b.id).total - voteSummary(a.id).total;
+        if (state.filters.sort === 'readiness-desc') return readiness(b).score - readiness(a).score;
         if (state.filters.sort === 'mass-asc') return massGrams(a) - massGrams(b);
         if (state.filters.sort === 'mass-desc') return massGrams(b) - massGrams(a);
         if (state.filters.sort === 'name-asc') return a.name.localeCompare(b.name);
@@ -934,6 +1192,13 @@
           specRow('Motion', motionLabel(part.physics.motion)),
           specRow('Constraint', constraintLabel(part.physics.joint_constraints?.[0]))
         ].join('');
+        const ready = readiness(part);
+        const license = licenseProfile(part);
+        node.querySelector('.readiness-score').textContent = `${ready.score}/100`;
+        node.querySelector('.readiness-grade').textContent = `Grade ${ready.grade}`;
+        node.querySelector('.readiness-status').textContent = ready.status;
+        node.querySelector('.license-name').textContent = license.license;
+        node.querySelector('.license-use').textContent = licenseUseLabel(license);
         bindVotePanel(node.querySelector('.vote-panel'), part.id);
 
         const tagWrap = node.querySelector('.competition-tags');
@@ -947,6 +1212,14 @@
         node.querySelector('.download-btn').addEventListener('click', () => {
           window.location.href = `/api/parts/${part.id}/smart-package`;
         });
+        const favoriteButton = node.querySelector('.favorite-btn');
+        favoriteButton.dataset.favoritePart = part.id;
+        applyFavoriteButtonStyle(favoriteButton, part.id);
+        favoriteButton.addEventListener('click', () => toggleFavorite(part.id, favoriteButton));
+        const compareButton = node.querySelector('.compare-btn');
+        compareButton.dataset.comparePart = part.id;
+        applyCompareButtonStyle(compareButton, part.id);
+        compareButton.addEventListener('click', () => toggleCompare(part.id));
         node.querySelector('.details-btn').addEventListener('click', () => {
           window.location.hash = `part=${encodeURIComponent(part.id)}`;
           openDetail(part.id);
@@ -1122,6 +1395,8 @@
     function populateDetail(part) {
       const summary = voteSummary(part.id);
       const verification = verificationState(part.id);
+      const ready = readiness(part);
+      const license = licenseProfile(part);
       document.querySelector('#detail-name').textContent = part.name;
       document.querySelector('#detail-summary').textContent = part.summary;
       document.querySelector('#detail-category').textContent = part.category;
@@ -1133,6 +1408,9 @@
         specRow('Center Of Mass', vector(part.physics.center_of_mass_mm)),
         specRow('Motion', motionLabel(part.physics.motion)),
         specRow('Constraint', constraintLabel(part.physics.joint_constraints?.[0])),
+        specRow('Readiness', `${ready.score}/100, Grade ${ready.grade} - ${ready.status}`),
+        specRow('License', `${license.license} (${licenseUseLabel(license)})`),
+        specRow('License Notes', license.notes),
         specRow('Source', sourceLabel(part)),
         specRow('Votes', `${summary.upvotes} genuine, ${summary.downvotes} not genuine`)
       ].join('');
@@ -1157,7 +1435,77 @@
       return new THREE.CylinderGeometry(0.85, 0.85, 1.25, 56);
     }
 
-    function renderDetailViewer(part) {
+    function normalizeGeometry(THREE, geometry) {
+      geometry.computeBoundingBox();
+      const box = geometry.boundingBox;
+      if (!box) return geometry;
+      const center = new THREE.Vector3();
+      const size = new THREE.Vector3();
+      box.getCenter(center);
+      box.getSize(size);
+      geometry.translate(-center.x, -center.y, -center.z);
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const scale = 2.25 / maxDim;
+      geometry.scale(scale, scale, scale);
+      geometry.computeVertexNormals();
+      return geometry;
+    }
+
+    function asciiStlGeometry(THREE, text) {
+      const vertices = [];
+      const pattern = /vertex\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)\s+([-+0-9.eE]+)/g;
+      let match;
+      while ((match = pattern.exec(text)) !== null) {
+        vertices.push(Number(match[1]), Number(match[2]), Number(match[3]));
+      }
+      if (vertices.length < 9) throw new Error('No ASCII STL vertices');
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      return normalizeGeometry(THREE, geometry);
+    }
+
+    function binaryStlGeometry(THREE, buffer) {
+      const view = new DataView(buffer);
+      const triangles = view.getUint32(80, true);
+      if (buffer.byteLength < 84 + triangles * 50 || triangles < 1) throw new Error('Invalid binary STL');
+      const vertices = new Float32Array(triangles * 9);
+      let offset = 84;
+      let cursor = 0;
+      for (let i = 0; i < triangles; i++) {
+        offset += 12;
+        for (let vertex = 0; vertex < 3; vertex++) {
+          vertices[cursor++] = view.getFloat32(offset, true);
+          vertices[cursor++] = view.getFloat32(offset + 4, true);
+          vertices[cursor++] = view.getFloat32(offset + 8, true);
+          offset += 12;
+        }
+        offset += 2;
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+      return normalizeGeometry(THREE, geometry);
+    }
+
+    async function previewGeometryForPart(THREE, part) {
+      try {
+        const response = await fetch(`/api/parts/${encodeURIComponent(part.id)}/preview-stl`);
+        if (!response.ok) throw new Error('Preview STL unavailable');
+        const buffer = await response.arrayBuffer();
+        const header = new TextDecoder().decode(buffer.slice(0, Math.min(buffer.byteLength, 256))).trimStart();
+        if (header.startsWith('solid')) {
+          try {
+            return asciiStlGeometry(THREE, new TextDecoder().decode(buffer));
+          } catch {
+            return binaryStlGeometry(THREE, buffer);
+          }
+        }
+        return binaryStlGeometry(THREE, buffer);
+      } catch {
+        return normalizeGeometry(THREE, geometryForPart(THREE, part));
+      }
+    }
+
+    async function renderDetailViewer(part) {
       const container = document.querySelector('#detail-viewer');
       if (detailAnimationId) cancelAnimationFrame(detailAnimationId);
       detailAnimationId = null;
@@ -1182,7 +1530,7 @@
 
       const [stroke] = colorFor(part.category);
       const group = new THREE.Group();
-      const geometry = geometryForPart(THREE, part);
+      const geometry = await previewGeometryForPart(THREE, part);
       const material = new THREE.MeshStandardMaterial({
         color: new THREE.Color(stroke),
         metalness: 0.45,
@@ -1264,6 +1612,12 @@
           <td class="py-2">${item.reason}</td>
           <td class="py-2">${item.status}</td>
         </tr>`).join('') || '<tr><td class="py-2 text-slate-500" colspan="3">No open reports</td></tr>';
+      const requestRows = (stats.latest_requests || []).map((item) => `
+        <tr class="border-b border-slate-800">
+          <td class="py-2 text-slate-200">${item.name}</td>
+          <td class="py-2">${item.category}</td>
+          <td class="py-2">${item.priority}</td>
+        </tr>`).join('') || '<tr><td class="py-2 text-slate-500" colspan="3">No model requests</td></tr>';
       adminContent.innerHTML = `
         <div class="grid gap-3 sm:grid-cols-5">
           ${[
@@ -1271,10 +1625,15 @@
             ['Categories', stats.categories],
             ['Uploads', stats.community_uploads],
             ['Votes', stats.total_votes],
-            ['Reports', stats.open_reports]
-          ].map(([label, value]) => `<div class="rounded-md border border-slate-700 bg-black/20 p-3"><span class="block text-xs uppercase text-slate-500">${label}</span><strong class="text-xl text-white">${Number(value).toLocaleString()}</strong></div>`).join('')}
+            ['Reports', stats.open_reports],
+            ['Requests', stats.model_requests],
+            ['Profiles', stats.profiles],
+            ['Favorites', stats.favorites],
+            ['Verified', stats.physix_verified],
+            ['Avg Ready', `${stats.average_readiness}/100`]
+          ].map(([label, value]) => `<div class="rounded-md border border-slate-700 bg-black/20 p-3"><span class="block text-xs uppercase text-slate-500">${label}</span><strong class="text-xl text-white">${Number.isFinite(Number(value)) ? Number(value).toLocaleString() : value}</strong></div>`).join('')}
         </div>
-        <div class="mt-5 grid gap-5 lg:grid-cols-2">
+        <div class="mt-5 grid gap-5 lg:grid-cols-3">
           <div>
             <h3 class="mb-2 text-sm font-semibold uppercase text-slate-400">Top Verified</h3>
             <table class="w-full text-left text-xs"><thead class="text-slate-500"><tr><th class="pb-2">Part</th><th class="pb-2">Score</th><th class="pb-2">Votes</th></tr></thead><tbody>${verifiedRows}</tbody></table>
@@ -1282,6 +1641,10 @@
           <div>
             <h3 class="mb-2 text-sm font-semibold uppercase text-slate-400">Open Reports</h3>
             <table class="w-full text-left text-xs"><thead class="text-slate-500"><tr><th class="pb-2">Part</th><th class="pb-2">Reason</th><th class="pb-2">Status</th></tr></thead><tbody>${reportRows}</tbody></table>
+          </div>
+          <div>
+            <h3 class="mb-2 text-sm font-semibold uppercase text-slate-400">Model Requests</h3>
+            <table class="w-full text-left text-xs"><thead class="text-slate-500"><tr><th class="pb-2">Part</th><th class="pb-2">Category</th><th class="pb-2">Priority</th></tr></thead><tbody>${requestRows}</tbody></table>
           </div>
         </div>`;
     }
@@ -1328,6 +1691,114 @@
         render();
       } catch {
         uploadStatus.textContent = 'Upload API unavailable or CAD URL is invalid.';
+      }
+    }
+
+    function fillProfileForm(profile = {}) {
+      profileForm.elements.display_name.value = profile.display_name || '';
+      profileForm.elements.email.value = profile.email || '';
+      profileForm.elements.role.value = profile.role || 'Student engineer';
+      profileForm.elements.team.value = profile.team || '';
+    }
+
+    async function submitProfile(event) {
+      event.preventDefault();
+      profileStatus.textContent = 'Saving...';
+      const form = new FormData(profileForm);
+      const payload = Object.fromEntries(form.entries());
+      payload.client_id = state.clientId;
+      try {
+        const response = await fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Profile save failed');
+        const data = await response.json();
+        state.profile = data.profile;
+        state.favoriteIds = new Set(data.favorite_ids || []);
+        profileStatus.textContent = 'Profile saved.';
+        updateActionCounters();
+        render();
+      } catch {
+        profileStatus.textContent = 'Profile API unavailable.';
+      }
+    }
+
+    async function submitModelRequest(event) {
+      event.preventDefault();
+      requestStatus.textContent = 'Submitting...';
+      const form = new FormData(requestForm);
+      const payload = Object.fromEntries(form.entries());
+      payload.requester_id = state.clientId;
+      try {
+        const response = await fetch('/api/model-requests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Request failed');
+        requestStatus.textContent = 'Request added to the PhysixCAD backlog.';
+        requestForm.reset();
+        requestForm.elements.category.value = 'Actuators & Motors';
+      } catch {
+        requestStatus.textContent = 'Request API unavailable.';
+      }
+    }
+
+    function compareCell(value) {
+      if (value == null || value === '') return '<span class="text-slate-500">Pending</span>';
+      if (typeof value === 'object') return `<code class="break-words text-xs text-slate-300">${JSON.stringify(value)}</code>`;
+      return String(value);
+    }
+
+    async function openCompare() {
+      if (state.compareIds.size < 2) return;
+      compareContent.innerHTML = '<div class="rounded-md border border-slate-700 bg-black/20 p-4 text-slate-400">Building comparison...</div>';
+      openModal(compareModal);
+      try {
+        const ids = [...state.compareIds].join(',');
+        const response = await fetch(`/api/compare?ids=${encodeURIComponent(ids)}`);
+        if (!response.ok) throw new Error('Compare API unavailable');
+        const data = await response.json();
+        const headers = data.parts.map((part) => `<th class="min-w-48 px-3 py-2 text-left text-slate-200">${part.name}<span class="mt-1 block text-[11px] font-normal text-slate-500">${part.category}</span></th>`).join('');
+        const rows = [
+          {
+            label: 'Trust',
+            values: Object.fromEntries(data.parts.map((part) => [part.id, `${trustScore(part)}/100`]))
+          },
+          ...data.metrics
+        ].map((metric) => `
+          <tr class="border-b border-slate-800">
+            <th class="sticky left-0 bg-slate-950 px-3 py-3 text-left text-xs uppercase text-slate-500">${metric.label}</th>
+            ${data.parts.map((part) => `<td class="px-3 py-3 align-top">${compareCell(metric.values[part.id])}</td>`).join('')}
+          </tr>
+        `).join('');
+        compareContent.innerHTML = `
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p class="text-slate-400">${data.count} models selected. Use this table to compare simulation readiness, material, mass, constraints, and licensing.</p>
+            <button id="compare-clear" class="inline-flex h-9 items-center gap-2 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-xs font-semibold text-slate-200 hover:border-rose-300/50 hover:text-rose-100" type="button">
+              <i data-lucide="x" class="h-3.5 w-3.5"></i>
+              Clear
+            </button>
+          </div>
+          <div class="overflow-x-auto rounded-md border border-slate-700">
+            <table class="w-full min-w-[56rem] text-sm">
+              <thead class="border-b border-slate-700 bg-black/25">
+                <tr><th class="sticky left-0 bg-slate-950 px-3 py-2 text-left text-xs uppercase text-slate-500">Metric</th>${headers}</tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+        document.querySelector('#compare-clear').addEventListener('click', () => {
+          state.compareIds.clear();
+          updateActionCounters();
+          closeModal(compareModal);
+          render();
+        });
+        if (window.lucide) window.lucide.createIcons();
+      } catch {
+        compareContent.innerHTML = '<div class="rounded-md border border-amber-300/40 bg-amber-300/10 p-4 text-amber-100">Compare API unavailable.</div>';
       }
     }
 
@@ -1384,12 +1855,23 @@
       state.visible = PAGE_SIZE;
       render();
     });
+    physixVerifiedOnly.addEventListener('change', (event) => {
+      state.filters.physixVerifiedOnly = event.target.checked;
+      state.visible = PAGE_SIZE;
+      render();
+    });
+    favoritesOnly.addEventListener('change', (event) => {
+      state.filters.favoritesOnly = event.target.checked;
+      state.visible = PAGE_SIZE;
+      updateActionCounters();
+      render();
+    });
     document.querySelector('#reset-filters').addEventListener('click', () => {
       state.filter = 'All';
       state.activeCollection = '';
       state.query = '';
       state.visible = PAGE_SIZE;
-      state.filters = { material: '', format: '', source: '', minMass: '', maxMass: '', verifiedOnly: false, needsReviewOnly: false, sort: 'trust-desc' };
+      state.filters = { material: '', format: '', source: '', minMass: '', maxMass: '', verifiedOnly: false, needsReviewOnly: false, physixVerifiedOnly: false, favoritesOnly: false, sort: 'trust-desc' };
       search.value = '';
       materialFilter.value = '';
       formatFilter.value = '';
@@ -1399,6 +1881,9 @@
       sortFilter.value = 'trust-desc';
       verifiedOnly.checked = false;
       needsReviewOnly.checked = false;
+      physixVerifiedOnly.checked = false;
+      favoritesOnly.checked = false;
+      updateActionCounters();
       renderCollections();
       renderFilters();
       render();
@@ -1412,24 +1897,43 @@
       openModal(uploadModal);
     });
     document.querySelector('#admin-open').addEventListener('click', openAdmin);
+    document.querySelector('#request-open').addEventListener('click', () => {
+      requestStatus.textContent = '';
+      openModal(requestModal);
+    });
+    document.querySelector('#profile-open').addEventListener('click', () => {
+      profileStatus.textContent = '';
+      fillProfileForm(state.profile || {});
+      openModal(profileModal);
+    });
+    favoritesToggle.addEventListener('click', () => {
+      state.filters.favoritesOnly = !state.filters.favoritesOnly;
+      favoritesOnly.checked = state.filters.favoritesOnly;
+      state.visible = PAGE_SIZE;
+      updateActionCounters();
+      render();
+    });
+    compareOpen.addEventListener('click', openCompare);
     document.querySelector('#detail-close').addEventListener('click', () => closeModal(detailModal));
     document.querySelectorAll('.modal-close').forEach((button) => {
       button.addEventListener('click', () => closeModal(button.closest('.modal-backdrop')));
     });
-    [detailModal, uploadModal, adminModal].forEach((modal) => {
+    [detailModal, uploadModal, adminModal, profileModal, requestModal, compareModal].forEach((modal) => {
       modal.addEventListener('click', (event) => {
         if (event.target === modal) closeModal(modal);
       });
     });
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
-        [detailModal, uploadModal, adminModal].forEach((modal) => {
+        [detailModal, uploadModal, adminModal, profileModal, requestModal, compareModal].forEach((modal) => {
           if (modal.getAttribute('aria-hidden') === 'false') closeModal(modal);
         });
       }
     });
     document.querySelector('#report-submit').addEventListener('click', submitReport);
     uploadForm.addEventListener('submit', submitUpload);
+    profileForm.addEventListener('submit', submitProfile);
+    requestForm.addEventListener('submit', submitModelRequest);
     window.addEventListener('physix-three-ready', () => {
       if (state.selectedPart) renderDetailViewer(state.selectedPart);
     });
@@ -1445,20 +1949,26 @@
     const collectionsRequest = fetch('/api/collections')
       .then((response) => response.ok ? response.json() : { collections: [] })
       .catch(() => ({ collections: [] }));
+    const profileRequest = fetch(`/api/profile?client_id=${encodeURIComponent(state.clientId)}`)
+      .then((response) => response.ok ? response.json() : { profile: null, favorite_ids: [] })
+      .catch(() => ({ profile: null, favorite_ids: [] }));
 
-    Promise.all([partsRequest, votesRequest, collectionsRequest])
-      .then(([data, voteData, collectionData]) => {
+    Promise.all([partsRequest, votesRequest, collectionsRequest, profileRequest])
+      .then(([data, voteData, collectionData, profileData]) => {
         state.parts = data.parts;
         state.categories = data.categories || [...new Set(data.parts.map((part) => part.category))].sort();
         state.votes = voteData.votes || {};
         state.userVotes = voteData.user_votes || {};
         state.collections = collectionData.collections || [];
+        state.profile = profileData.profile || null;
+        state.favoriteIds = new Set(profileData.favorite_ids || []);
         document.querySelector('#stat-models').textContent = data.count.toLocaleString();
         document.querySelector('#stat-categories').textContent = state.categories.length.toLocaleString();
         document.querySelector('#stat-images').textContent = data.parts.filter((part) => part.media?.image_url).length.toLocaleString();
         renderAdvancedFilterOptions();
         renderCollections();
         renderFilters();
+        updateActionCounters();
         render();
         const match = window.location.hash.match(/^#part=(.+)$/);
         if (match) openDetail(decodeURIComponent(match[1]));
